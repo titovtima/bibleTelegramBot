@@ -58,8 +58,17 @@ type Update struct {
 }
 
 type SendMessage struct {
-	ChatId int64  `json:"chat_id"`
-	Text   string `json:"text"`
+	ChatId      int64               `json:"chat_id"`
+	Text        string              `json:"text"`
+	ReplyMarkup ReplyKeyboardMarkup `json:"reply_markup"`
+}
+
+type KeyboardButton struct {
+	Text string `json:"text"`
+}
+
+type ReplyKeyboardMarkup struct {
+	Keyboard [][]KeyboardButton `json:"keyboard"`
 }
 
 func createWebhook() {

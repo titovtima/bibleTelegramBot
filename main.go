@@ -31,7 +31,13 @@ func main() {
 		}
 		writer.WriteHeader(200)
 		if update.Message.Text != "" && update.Message.Chat.Id != 0 {
-			go sendMessage(SendMessage{update.Message.Chat.Id, bible.getRandomVerse()})
+			message := SendMessage{
+				ChatId: update.Message.Chat.Id,
+				Text:   bible.getRandomVerse(),
+				ReplyMarkup: ReplyKeyboardMarkup{[][]KeyboardButton{{{
+					"Следующий случайный стих"}}}},
+			}
+			go sendMessage(message)
 		}
 	})
 	log.Fatal(http.ListenAndServe(":2403", nil))
