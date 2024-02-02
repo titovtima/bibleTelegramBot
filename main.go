@@ -9,9 +9,14 @@ import (
 
 func main() {
 	var bible *Bible
+	var versesLists []VersesList
 
 	go func() {
 		bible = getBibleFromFile()
+	}()
+	go func() {
+		versesLists = getVersesListsFromFile()
+		println(versesLists[0].getRandomVerse(bible))
 	}()
 	createWebhook()
 

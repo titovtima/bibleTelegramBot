@@ -1,0 +1,99 @@
+{
+  "lists": [
+    {
+      "title": "general",
+      "list": [
+        {
+          "book": 19,
+          "chapter": 1,
+          "verses": [1, 2]
+        },
+        {
+          "book": 19,
+          "chapter": 1,
+          "verses": [3]
+        },
+        {
+          "book": 19,
+          "chapter": 1,
+          "verses": [5, 6]
+        },
+        {
+          "book": 19,
+          "chapter": 2,
+          "verses": [1, 2, 3, 4]
+        },
+        {
+          "book": 19,
+          "chapter": 2,
+          "verses": [7]
+        },
+        {
+          "book": 19,
+          "chapter": 3,
+          "verses": [2, 3, 4]
+        },
+        {
+          "book": 19,
+          "chapter": 3,
+          "verses": [4]
+        },
+        {
+          "book": 19,
+          "chapter": 3,
+          "verses": [5]
+        },
+        {
+          "book": 19,
+          "chapter": 3,
+          "verses": [6]
+        },
+        {
+          "book": 19,
+          "chapter": 3,
+          "verses": [7, 8]
+        },
+        {
+          "book": 19,
+          "chapter": 3,
+          "verses": [8]
+        },
+        {
+          "book": 19,
+          "chapter": 3,
+          "verses": [8, 9]
+        },
+        {
+          "book": 19,
+          "chapter": 3,
+          "verses": [9]
+        },
+        {
+          "book": 19,
+          "chapter": 4,
+          "verses": [2]
+        },
+        {
+          "book": 19,
+          "chapter": 4,
+          "verses": [4]
+        },
+        {
+          "book": 19,
+          "chapter": 4,
+          "verses": [8]
+        },
+        {
+          "book": 19,
+          "chapter": 4,
+          "verses": [9]
+        },
+        {
+          "book": 19,
+          "chapter": 150,
+          "verses": [6]
+        }
+      ]
+    }
+  ]
+}
