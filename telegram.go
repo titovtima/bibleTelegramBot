@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httputil"
+	"os"
 )
 
-const TelegramApiToken = "my_telegram_token"
-const TelegramApiUrl = "https://api.telegram.org/bot" + TelegramApiToken
-const UrlForWebhook = "https://test.titovtima.ru/test_bot"
-const BotName = "bot_nickname"
+var TelegramApiToken string = os.Getenv("TELEGRAM_API_TOKEN")
+var TelegramApiUrl string = "https://api.telegram.org/bot" + TelegramApiToken
+var UrlForWebhook = os.Getenv("URL_FOR_WEBHOOK")
+var BotName = os.Getenv("BOT_USERNAME")
 
 type TelegramChatType string
 

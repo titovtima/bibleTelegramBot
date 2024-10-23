@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -271,5 +272,6 @@ func main() {
 		}
 		writer.WriteHeader(200)
 	})
-	log.Fatal(http.ListenAndServe(":2396", nil))
+	port := os.Getenv("LOCAL_PORT")
+	log.Fatal(http.ListenAndServe(":" + port, nil))
 }
