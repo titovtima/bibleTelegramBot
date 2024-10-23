@@ -25,6 +25,7 @@ const (
 	MessageStatusAddCron4    MessageStatus = 4
 	MessageStatusAddCronCron MessageStatus = 5
 	MessageStatusSetTimezone MessageStatus = 20
+	MessageStatusBroadcast   MessageStatus = 10000
 )
 
 type ChatData struct {

@@ -23,6 +23,7 @@ func main() {
 	versesLists = getVersesListsFromFile()
 	println(getRandomVerseFromList(bible, versesLists, ""))
 	createWebhook()
+	getAdminId()
 
 	// location, err := time.LoadLocation("Europe/Moscow")
 	// if err != nil {
@@ -275,6 +276,18 @@ func main() {
 				go sendMessage(message)
 				return
 			}
+			if update.Message.Text == "/broadcast" || update.Message.Text == "/broadcast@"+BotName {
+				if update.Message.From.Id == adminId {
+					chatData.MessageStatus = MessageStatusBroadcast
+					saveChatsDataToFile()
+					message := SendMessage{
+						ChatId:    update.Message.Chat.Id,
+						Text:      "Отправьте сообщение для общей рассылки",
+					}
+					go sendMessage(message)
+					return
+				}
+			}
 			if chatData.MessageStatus >= 1 && chatData.MessageStatus <= 5 {
 				if update.Message.Text != "" {
 					var crons []string
@@ -389,6 +402,20 @@ func main() {
 				}
 				go sendMessage(message)
 				return
+			} else if chatData.MessageStatus == MessageStatusBroadcast {
+				if update.Message.From.Id == adminId {
+					if update.Message.Text != "" {
+						chatData.MessageStatus = MessageStatusDefault
+						saveChatsDataToFile()
+						broadcastMessageToAll(update.Message.Text, update.Message.Entities)
+						message := SendMessage{
+							ChatId: adminId,
+							Text: "Сообщение разослано",
+						}
+						go sendMessage(message)
+						return
+					}
+				}
 			}
 		}
 		writer.WriteHeader(200)
