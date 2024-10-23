@@ -10,6 +10,7 @@ import (
 const TelegramApiToken = "my_telegram_token"
 const TelegramApiUrl = "https://api.telegram.org/bot" + TelegramApiToken
 const UrlForWebhook = "https://test.titovtima.ru/test_bot"
+const BotName = "bot_nickname"
 
 type TelegramChatType string
 
@@ -41,6 +42,19 @@ type Message struct {
 	Text string
 }
 
+type MaybeInaccessibleMessage struct {
+	Chat      TelegramChat
+	MessageId int
+	Date      int
+}
+
+type CallbackQuery struct {
+	Id      string
+	From    TelegramUser
+	Data    string
+	Message *MaybeInaccessibleMessage
+}
+
 type Webhook struct {
 	Url            string   `json:"url"`
 	AllowedUpdates []string `json:"allowed_updates"`
@@ -53,15 +67,19 @@ type WebhookResponse struct {
 }
 
 type Update struct {
-	UpdateId int `json:"update_id"`
-	Message  Message
+	UpdateId      int            `json:"update_id"`
+	Message       *Message
+	CallbackQuery *CallbackQuery `json:"callback_query"`
 }
 
 type SendMessage struct {
-	ChatId      int64               `json:"chat_id"`
-	Text        string              `json:"text"`
-	ReplyMarkup ReplyKeyboardMarkup `json:"reply_markup"`
+	ChatId      int64       `json:"chat_id"`
+	Text        string      `json:"text"`
+	ReplyMarkup ReplyMarkup `json:"reply_markup,omitempty"`
+	ParseMode   string      `json:"parse_mode,omitempty"`
 }
+
+type ReplyMarkup interface { ImplementsReplyMarkup() }
 
 type KeyboardButton struct {
 	Text string `json:"text"`
@@ -70,6 +88,22 @@ type KeyboardButton struct {
 type ReplyKeyboardMarkup struct {
 	Keyboard [][]KeyboardButton `json:"keyboard"`
 }
+func (r ReplyKeyboardMarkup) ImplementsReplyMarkup() {}
+
+type InlineKeyboardButton struct {
+	Text         string `json:"text"`
+	CallbackData string `json:"callback_data"`
+}
+
+type InlineKeyboardMarkup struct {
+	InlineKeyboard [][]InlineKeyboardButton `json:"inline_keyboard"`
+}
+func (i InlineKeyboardMarkup) ImplementsReplyMarkup() {}
+
+type ReplyKeyboardRemove struct {
+	RemoveKeyboard bool `json:"remove_keyboard"`
+}
+func (r ReplyKeyboardRemove) ImplementsReplyMarkup() {}
 
 func createWebhook() {
 	client := http.Client{}
