@@ -48,6 +48,7 @@ type Message struct {
 	Chat     TelegramChat
 	Text     string
 	Location *Location
+	Entities []MessageEntity
 }
 
 type MaybeInaccessibleMessage struct {
@@ -80,6 +81,16 @@ type Update struct {
 	CallbackQuery *CallbackQuery `json:"callback_query"`
 }
 
+type MessageEntity struct {
+	Type          string       `json:"type"`
+	Offset        int          `json:"offset"`
+	Length        int          `json:"length"`
+	Url           string       `json:"url,omitempty"`
+	User          TelegramUser `json:"user,omitempty"`
+	Language      string       `json:"language,omitempty"`
+	CustomEmojiId string       `json:"custom_emoji_id,omitempty"`
+}
+
 type LinkPreviewOptions struct {
 	IsDisabled bool `json:"is_disabled"`
 }
@@ -90,6 +101,7 @@ type SendMessage struct {
 	ReplyMarkup        ReplyMarkup        `json:"reply_markup,omitempty"`
 	ParseMode          string             `json:"parse_mode,omitempty"`
 	LinkPreviewOptions LinkPreviewOptions `json:"link_preview_options,omitempty"`
+	Entities           []MessageEntity    `json:"entities,omitempty"`
 }
 
 type ReplyMarkup interface { ImplementsReplyMarkup() }
