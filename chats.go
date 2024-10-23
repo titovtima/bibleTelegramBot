@@ -10,6 +10,7 @@ import (
 )
 
 const chatsDataFileName = "chatsData.json"
+const defaultTimezone = "Europe/Moscow"
 
 var chatsData []ChatData
 var chatsCronJobsIds = make(map[int64]map[string]uuid.UUID)
@@ -23,12 +24,14 @@ const (
 	MessageStatusAddCron3    MessageStatus = 3
 	MessageStatusAddCron4    MessageStatus = 4
 	MessageStatusAddCronCron MessageStatus = 5
+	MessageStatusSetTimezone MessageStatus = 20
 )
 
 type ChatData struct {
 	ChatId        int64
 	MessageStatus MessageStatus
 	VersesCrons   []string
+	Timezone      string
 }
 
 type ChatsDataFile struct {
@@ -59,13 +62,14 @@ func readChatsDataFromFile() {
 
 	chatsData = data.ChatsData
 
-	for _, chatData := range data.ChatsData {
+	for _, chatData := range chatsData {
 		chatsCronJobsIds[chatData.ChatId] = make(map[string]uuid.UUID)
 		addCronsForChat(chatData.VersesCrons, chatData.ChatId, true)
 	}
 }
 
 func saveChatsDataToFile() error {
+	println("saving chats data")
 	fo, err := os.Create(chatsDataFileName)
 	if err != nil {
 		return err
@@ -73,6 +77,8 @@ func saveChatsDataToFile() error {
 
 	data := ChatsDataFile{chatsData}
 	b, err := json.Marshal(data)
+
+	println(string(b))
 	if err != nil {
 		return err
 	}
@@ -88,7 +94,7 @@ func saveChatsDataToFile() error {
 func getChatData(chatId int64) *ChatData {
 	ind := slices.IndexFunc(chatsData, func(cd ChatData) bool { return cd.ChatId == chatId })
 	if ind == -1 {
-		data := ChatData{chatId, MessageStatusDefault, []string{}}
+		data := ChatData{chatId, MessageStatusDefault, []string{}, defaultTimezone}
 		chatsData = append(chatsData, data)
 		saveChatsDataToFile()
 		chatsCronJobsIds[chatId] = make(map[string]uuid.UUID)

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
+	"strings"
 )
 
 var TelegramApiToken string = os.Getenv("TELEGRAM_API_TOKEN")
@@ -35,12 +36,18 @@ type TelegramUser struct {
 	LanguageCode string
 }
 
+type Location struct {
+	Latitude  float64
+	Longitude float64
+}
+
 type Message struct {
-	Id   int64
-	From TelegramUser
-	Date int64
-	Chat TelegramChat
-	Text string
+	Id       int64
+	From     TelegramUser
+	Date     int64
+	Chat     TelegramChat
+	Text     string
+	Location *Location
 }
 
 type MaybeInaccessibleMessage struct {
@@ -73,17 +80,23 @@ type Update struct {
 	CallbackQuery *CallbackQuery `json:"callback_query"`
 }
 
+type LinkPreviewOptions struct {
+	IsDisabled bool `json:"is_disabled"`
+}
+
 type SendMessage struct {
-	ChatId      int64       `json:"chat_id"`
-	Text        string      `json:"text"`
-	ReplyMarkup ReplyMarkup `json:"reply_markup,omitempty"`
-	ParseMode   string      `json:"parse_mode,omitempty"`
+	ChatId             int64              `json:"chat_id"`
+	Text               string             `json:"text"`
+	ReplyMarkup        ReplyMarkup        `json:"reply_markup,omitempty"`
+	ParseMode          string             `json:"parse_mode,omitempty"`
+	LinkPreviewOptions LinkPreviewOptions `json:"link_preview_options,omitempty"`
 }
 
 type ReplyMarkup interface { ImplementsReplyMarkup() }
 
 type KeyboardButton struct {
-	Text string `json:"text"`
+	Text            string `json:"text"`
+	RequestLocation bool   `json:"request_location,omitempty"`
 }
 
 type ReplyKeyboardMarkup struct {
@@ -101,10 +114,11 @@ type InlineKeyboardMarkup struct {
 }
 func (i InlineKeyboardMarkup) ImplementsReplyMarkup() {}
 
-type ReplyKeyboardRemove struct {
+type ReplyKeyboardRemoveType struct {
 	RemoveKeyboard bool `json:"remove_keyboard"`
 }
-func (r ReplyKeyboardRemove) ImplementsReplyMarkup() {}
+func (r ReplyKeyboardRemoveType) ImplementsReplyMarkup() {}
+var ReplyKeyboardRemove = ReplyKeyboardRemoveType{true}
 
 func createWebhook() {
 	client := http.Client{}
@@ -147,4 +161,16 @@ func sendMessage(m SendMessage) {
 		println(err)
 		return
 	}
+}
+
+func escapingSymbols(str string) string {
+	symbols := "_*[]()~`>#+-=|{}.!"
+	res := ""
+	for _, s := range str {
+		if strings.Contains(symbols, string(s)) {
+			res += "\\"
+		}
+		res += string(s)
+	}
+	return res
 }

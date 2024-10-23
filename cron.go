@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -166,6 +168,8 @@ func parseListWeekDayTimesToCron(timeInput string) ([]string, error) {
 	return list, nil
 }
 
+
+
 var weekDaysNames = []string{
 	"Каждое воскресенье",
 	"Каждый понедельник",
@@ -211,10 +215,8 @@ func addCronsForChat(crons []string, chatId int64, onlyJob bool) {
 		saveChatsDataToFile()
 	}
 	for _, cron := range crons {
-		job, err := scheduler.NewJob(gocron.CronJob(cron, false),
-			gocron.NewTask(func(chatId int64) {
-				randomVerseTask(chatId)
-			}, chatId))
+		job, err := scheduler.NewJob(gocron.CronJob(fmt.Sprintf("TZ=%s %s", chatData.Timezone, cron), false),
+			gocron.NewTask(randomVerseTask, chatId))
 		if err != nil {
 			println(err)
 			continue
@@ -231,15 +233,23 @@ func randomVerseTask(chatId int64) {
 	go sendMessage(message)
 }
 
-func clearCronsForChat(chatId int64) {
+func clearCronsForChat(chatId int64, onlyJobs bool) {
 	idsList := chatsCronJobsIds[chatId]
 	for _, jobId := range idsList {
 		scheduler.RemoveJob(jobId)
 	}
 	chatsCronJobsIds[chatId] = make(map[string]uuid.UUID)
+	if !onlyJobs {
+		chatData := getChatData(chatId)
+		chatData.VersesCrons = []string{}
+		saveChatsDataToFile()
+	}
+}
+
+func recreateJobsForChat(chatId int64) {
 	chatData := getChatData(chatId)
-	chatData.VersesCrons = []string{}
-	saveChatsDataToFile()
+	clearCronsForChat(chatId, true)
+	addCronsForChat(chatData.VersesCrons, chatId, true)
 }
 
 func removeCronForChat(chatId int64, cron string) {
@@ -257,4 +267,21 @@ func filter[T any](ss []T, test func(T) bool) (ret []T) {
         }
     }
     return
+}
+
+type CurrentTimeResponse struct {
+	Timezone string `json:"timeZone"`
+}
+
+func getTimezoneByLocation(location Location) (string, error) {
+	resp, err := http.Get(fmt.Sprintf(
+		"https://www.timeapi.io/api/time/current/coordinate?latitude=%f&longitude=%f", location.Latitude, location.Longitude))
+	if err != nil { return "", err }
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil { return "", err }
+	var respData CurrentTimeResponse
+	err = json.Unmarshal(body, &respData)
+	if err != nil { return "", err }
+	return respData.Timezone, nil
 }
