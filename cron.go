@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -284,4 +285,71 @@ func getTimezoneByLocation(location Location) (string, error) {
 	err = json.Unmarshal(body, &respData)
 	if err != nil { return "", err }
 	return respData.Timezone, nil
+}
+
+var chooseTimezoneKeyboard = ReplyKeyboardMarkup{[][]KeyboardButton{{{ "Отправить геопозицию", true }}, 
+	{{"UTC+0", false}, {"UTC+1", false}, {"UTC+2", false}, {"UTC+3", false}},
+	{{"UTC+4", false}, {"UTC+5", false}, {"UTC+6", false}, {"UTC+7", false}},
+	{{"UTC+8", false}, {"UTC+9", false}, {"UTC+10", false}, {"UTC+11", false}},
+	{{"UTC+12", false}, {"UTC+13", false}, {"UTC+14", false}},
+	{{"UTC-1", false}, {"UTC-2", false}, {"UTC-3", false}, {"UTC-4", false}},
+	{{"UTC-5", false}, {"UTC-6", false}, {"UTC-7", false}, {"UTC-8", false}},
+	{{"UTC-9", false}, {"UTC-10", false}, {"UTC-11", false}, {"UTC-12", false}},
+}}
+
+var chooseTimezoneKeyboardNoLocation = ReplyKeyboardMarkup{[][]KeyboardButton{ 
+	{{"UTC+0", false}, {"UTC+1", false}, {"UTC+2", false}, {"UTC+3", false}},
+	{{"UTC+4", false}, {"UTC+5", false}, {"UTC+6", false}, {"UTC+7", false}},
+	{{"UTC+8", false}, {"UTC+9", false}, {"UTC+10", false}, {"UTC+11", false}},
+	{{"UTC+12", false}, {"UTC+13", false}, {"UTC+14", false}},
+	{{"UTC-1", false}, {"UTC-2", false}, {"UTC-3", false}, {"UTC-4", false}},
+	{{"UTC-5", false}, {"UTC-6", false}, {"UTC-7", false}, {"UTC-8", false}},
+	{{"UTC-9", false}, {"UTC-10", false}, {"UTC-11", false}, {"UTC-12", false}},
+}}
+
+type TimezoneDiff struct{
+	Diff     string
+	Timezone string
+}
+
+var timezonesDiffs []TimezoneDiff
+
+func readTimezonesDiffsFile() {
+	fi, err := os.Open("timeZonesFromDiff.json")
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := fi.Close(); err != nil {
+			panic(err)
+		}
+	}()
+
+	b, err := io.ReadAll(fi)
+	if err != nil {
+		panic(err)
+	}
+
+	err = json.Unmarshal(b, &timezonesDiffs)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func getTimezoneByDiff(diff string) string {
+	for _, diffTz := range timezonesDiffs {
+		if diffTz.Diff == diff {
+			return diffTz.Timezone
+		}
+	}
+	return diff
+}
+
+func displayTimezone(timezone string) string {
+	for _, diffTz := range timezonesDiffs {
+		if diffTz.Timezone == timezone {
+			return diffTz.Diff
+		}
+	}
+	return timezone
 }

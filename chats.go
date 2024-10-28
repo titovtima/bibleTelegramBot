@@ -70,7 +70,6 @@ func readChatsDataFromFile() {
 }
 
 func saveChatsDataToFile() error {
-	println("saving chats data")
 	fo, err := os.Create(chatsDataFileName)
 	if err != nil {
 		return err
@@ -78,8 +77,6 @@ func saveChatsDataToFile() error {
 
 	data := ChatsDataFile{chatsData}
 	b, err := json.Marshal(data)
-
-	println(string(b))
 	if err != nil {
 		return err
 	}
@@ -102,4 +99,17 @@ func getChatData(chatId int64) *ChatData {
 		return &data
 	}
 	return &chatsData[ind]
+}
+
+func getStartMessage(chatId int64) SendMessage {
+	return SendMessage{
+		ChatId: chatId,
+		Text: escapingSymbols("Добро пожаловать! Я - бот для отправки случайных стихов из Библии. Например:\n\n" + getRandomVerseFromList(2) +
+			"\n\nЧтобы получить случайный стих, используйте команду /random.\n\n" +
+			"Можете настроить расписания получения случайных стихов с помощью команд /getregular, /addregular, /removeregular, /clearregular.\n\n") +
+			"По умолчанию установлен часовой пояс `Europe/Moscow` \\(UTC\\+3\\)\\. " + 
+			"Можете отправить геопозицию для определения вашего часового пояса, ввести название вручную, или выбрать разницу с UTC\\.",
+		ReplyMarkup: chooseTimezoneKeyboard,
+		ParseMode: "MarkdownV2",
+	}
 }
