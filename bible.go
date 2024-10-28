@@ -8,6 +8,11 @@ import (
 	"strconv"
 )
 
+const versesListsFileName = "versesLists.json"
+
+var bible Bible
+var versesLists []VersesList
+
 type Verse string
 type Chapter []Verse
 type Book struct {
@@ -26,15 +31,20 @@ type LongVerse struct {
 }
 
 type VersesList struct {
-	Title string      `json:"title"`
-	List  []LongVerse `json:"list"`
+	Id      int
+	Title   string      `json:"title"`
+	List    []LongVerse `json:"list"`
+	OwnerId int64
+	Writers []int64
+	Readers []int64
+	Public  bool
 }
 
 type VersesListFile struct {
 	Lists []VersesList `json:"lists"`
 }
 
-func getBibleFromFile() *Bible {
+func getBibleFromFile() {
 	fi, err := os.Open("bible.json")
 	if err != nil {
 		panic(err)
@@ -50,17 +60,14 @@ func getBibleFromFile() *Bible {
 		panic(err)
 	}
 
-	var bible Bible
 	err = json.Unmarshal(b, &bible)
 	if err != nil {
 		panic(err)
 	}
-
-	return &bible
 }
 
-func getVersesListsFromFile() []VersesList {
-	fi, err := os.Open("versesLists.json")
+func getVersesListsFromFile() {
+	fi, err := os.Open(versesListsFileName)
 	if err != nil {
 		panic(err)
 	}
@@ -81,7 +88,27 @@ func getVersesListsFromFile() []VersesList {
 		panic(err)
 	}
 
-	return versesListsFile.Lists
+	versesLists = versesListsFile.Lists
+}
+
+func saveVersesListsToFile() error {
+	fo, err := os.Create(versesListsFileName)
+	if err != nil {
+		return err
+	}
+
+	data := VersesListFile{versesLists}
+	b, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	_, err = fo.Write(b)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (bible *Bible) getVerse(book int, chapter int, verse int) string {
@@ -96,7 +123,7 @@ func (bible *Bible) getRandomVerse() string {
 	return formatResult(string(chapter[verseNum]), book.ShortTitle, chapterNum+1, []int{verseNum + 1})
 }
 
-func (list *VersesList) getRandomVerse(bible *Bible) string {
+func (list *VersesList) getRandomVerse() string {
 	longVerse := list.List[rand.Intn(len(list.List))]
 	result := bible.getVerse(longVerse.Book, longVerse.Chapter, longVerse.Verses[0])
 	prev := longVerse.Verses[0]
@@ -110,13 +137,10 @@ func (list *VersesList) getRandomVerse(bible *Bible) string {
 	return formatResult(result, bible.Books[longVerse.Book-1].ShortTitle, longVerse.Chapter, longVerse.Verses)
 }
 
-func getRandomVerseFromList(bible *Bible, lists []VersesList, list string) string {
-	if list == "" {
-		list = "general"
-	}
-	for _, verseList := range lists {
-		if verseList.Title == list {
-			return verseList.getRandomVerse(bible)
+func getRandomVerseFromList(listId int) string {
+	for _, verseList := range versesLists {
+		if verseList.Id == listId {
+			return verseList.getRandomVerse()
 		}
 	}
 	return ""

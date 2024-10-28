@@ -13,22 +13,14 @@ import (
 	"github.com/go-co-op/gocron/v2"
 )
 
-var bible *Bible
 var scheduler gocron.Scheduler
 
 func main() {
-	var versesLists []VersesList
-
-	bible = getBibleFromFile()
-	versesLists = getVersesListsFromFile()
-	println(getRandomVerseFromList(bible, versesLists, ""))
+	getBibleFromFile()
+	getVersesListsFromFile()
+	println(getRandomVerseFromList(1))
 	createWebhook()
 
-	// location, err := time.LoadLocation("Europe/Moscow")
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// scheduler, err = gocron.NewScheduler(gocron.WithLocation(location))
 	var err error
 	scheduler, err = gocron.NewScheduler()
 	if err != nil {
@@ -39,13 +31,7 @@ func main() {
 	defer func() { scheduler.Shutdown() }()
 
 	readChatsDataFromFile()
-	for i, chatData := range chatsData {
-		if chatData.Timezone == "" {
-			chatData.Timezone = defaultTimezone
-			chatsData[i] = chatData
-		}
-	}
-	saveChatsDataToFile()
+	readTimezonesDiffsFile()
 
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		body, err := io.ReadAll(request.Body)
@@ -246,10 +232,10 @@ func main() {
 				if update.Message.Chat.ChatType == ChatTypePrivate {
 					message := SendMessage{
 						ChatId: update.Message.Chat.Id,
-						Text: "Отправьте геопозицию, или введите [название](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) часового пояса " +
-							"\\(Например: `Europe/Moscow`\\)",
+						Text: "Отправьте геопозицию, введите [название](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) часового пояса " +
+							"\\(Например: `Europe/Moscow`\\), или выберите разницу с UTC \\(Например: `UTC+1`\\)",
 						ParseMode:   "MarkdownV2",
-						ReplyMarkup: ReplyKeyboardMarkup{[][]KeyboardButton{{{"Отправить местоположение", true}}}},
+						ReplyMarkup: chooseTimezoneKeyboard,
 						LinkPreviewOptions: LinkPreviewOptions{true},
 					}
 					go sendMessage(message)
@@ -258,8 +244,9 @@ func main() {
 					message := SendMessage{
 						ChatId: update.Message.Chat.Id,
 						Text: "Введите [название](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) часового пояса " +
-							"\\(Например: `Europe/Moscow`\\)",
+							"\\(Например: `Europe/Moscow`\\), или выберите разницу с UTC \\(Например: `UTC+1`\\)",
 						ParseMode: "MarkdownV2",
+						ReplyMarkup: chooseTimezoneKeyboardNoLocation,
 						LinkPreviewOptions: LinkPreviewOptions{true},
 					}
 					go sendMessage(message)
@@ -269,10 +256,17 @@ func main() {
 			if update.Message.Text == "/gettimezone" || update.Message.Text == "/gettimezone@"+BotName {
 				message := SendMessage{
 					ChatId:    update.Message.Chat.Id,
-					Text:      fmt.Sprintf("Текущий часовой пояс: `%s`", chatData.Timezone),
+					Text:      fmt.Sprintf("Текущий часовой пояс: `%s`", displayTimezone(chatData.Timezone)),
 					ParseMode: "MarkdownV2",
 				}
 				go sendMessage(message)
+				return
+			}
+			if update.Message.Text == "/start" || update.Message.Text == "/start@"+BotName {
+				message := getStartMessage(update.Message.Chat.Id)
+				go sendMessage(message)
+				chatData.MessageStatus = MessageStatusSetTimezone
+				saveChatsDataToFile()
 				return
 			}
 			if chatData.MessageStatus >= 1 && chatData.MessageStatus <= 5 {
@@ -344,7 +338,7 @@ func main() {
 						return
 					}
 				} else {
-					timezone = update.Message.Text
+					timezone = getTimezoneByDiff(update.Message.Text)
 					_, err := time.LoadLocation(timezone)
 					if err != nil {
 						message := SendMessage{
@@ -362,7 +356,7 @@ func main() {
 				chatData.MessageStatus = MessageStatusDefault
 				saveChatsDataToFile()
 				go recreateJobsForChat(chatData.ChatId)
-				text := "Часовой пояс `" + timezone + "` успешно установлен\\. "
+				text := "Часовой пояс `" + displayTimezone(timezone) + "` успешно установлен\\. "
 				if len(chatData.VersesCrons) == 0 {
 					message := SendMessage{
 						ChatId:    update.Message.Chat.Id,
