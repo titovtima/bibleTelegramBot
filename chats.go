@@ -101,11 +101,14 @@ func getChatData(chatId int64) *ChatData {
 	return &chatsData[ind]
 }
 
+const randomVerseTextMessage = "Следующий случайный стих"
+var nextRandomReplyMarkup = ReplyKeyboardMarkup{[][]KeyboardButton{{{randomVerseTextMessage, false}}}}
+
 func getStartMessage(chatId int64) SendMessage {
 	return SendMessage{
 		ChatId: chatId,
 		Text: escapingSymbols("Добро пожаловать! Я - бот для отправки случайных стихов из Библии. Например:\n\n" + getRandomVerseFromList(2) +
-			"\n\nЧтобы получить случайный стих, используйте команду /random.\n\n" +
+			"\n\nЧтобы получить случайный стих, используйте команду /random, или напишите \"" + randomVerseTextMessage + "\" (можете использовать кнопку).\n\n" +
 			"Можете настроить расписания получения случайных стихов с помощью команд /getregular, /addregular, /removeregular, /clearregular.\n\n") +
 			"По умолчанию установлен часовой пояс `Europe/Moscow` \\(UTC\\+3\\)\\. " + 
 			"Можете отправить геопозицию для определения вашего часового пояса, ввести название вручную, выбрать разницу с UTC, " +

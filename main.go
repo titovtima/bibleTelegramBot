@@ -111,7 +111,7 @@ func main() {
 					ChatId:      update.CallbackQuery.Message.Chat.Id,
 					Text:        "Расписание `" + strings.Trim(update.CallbackQuery.Data[11:], " ") + "` удалено",
 					ParseMode:   "MarkdownV2",
-					ReplyMarkup: ReplyKeyboardRemove,
+					ReplyMarkup: nextRandomReplyMarkup,
 				}
 				go sendMessage(message)
 			}
@@ -130,7 +130,7 @@ func main() {
 					message := SendMessage{
 						ChatId:      update.Message.Chat.Id,
 						Text:        "Операция отменена",
-						ReplyMarkup: ReplyKeyboardRemove,
+						ReplyMarkup: nextRandomReplyMarkup,
 					}
 					go sendMessage(message)
 				}
@@ -219,7 +219,7 @@ func main() {
 				go sendMessage(message)
 				return
 			}
-			if update.Message.Text == "/random" || update.Message.Text == "/random@"+BotName {
+			if update.Message.Text == "/random" || update.Message.Text == "/random@"+BotName || update.Message.Text == randomVerseTextMessage {
 				message := SendMessage{
 					ChatId: update.Message.Chat.Id,
 					Text:   bible.getRandomVerse(),
@@ -270,6 +270,7 @@ func main() {
 					message := SendMessage{
 						ChatId:    update.Message.Chat.Id,
 						Text:      "Отправьте сообщение для общей рассылки",
+						ReplyMarkup: ReplyKeyboardRemove,
 					}
 					go sendMessage(message)
 					return
@@ -327,6 +328,7 @@ func main() {
 					message := SendMessage{
 						ChatId: update.Message.Chat.Id,
 						Text:   "Расписание успешно добавлено",
+						ReplyMarkup: nextRandomReplyMarkup,
 					}
 					go sendMessage(message)
 					return
@@ -375,7 +377,7 @@ func main() {
 						ChatId:    update.Message.Chat.Id,
 						Text:      text,
 						ParseMode: "MarkdownV2",
-						ReplyMarkup: ReplyKeyboardRemove,
+						ReplyMarkup: nextRandomReplyMarkup,
 					}
 					go sendMessage(message)
 					return
@@ -405,6 +407,7 @@ func main() {
 						message := SendMessage{
 							ChatId: adminId,
 							Text: "Сообщение разослано",
+							ReplyMarkup: nextRandomReplyMarkup,
 						}
 						go sendMessage(message)
 						return
