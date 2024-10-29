@@ -395,7 +395,7 @@ func main() {
 					ChatId:      update.Message.Chat.Id,
 					Text:        text,
 					ParseMode:   "MarkdownV2",
-					ReplyMarkup: ReplyKeyboardRemove,
+					ReplyMarkup: nextRandomReplyMarkup,
 				}
 				go sendMessage(message)
 				return
