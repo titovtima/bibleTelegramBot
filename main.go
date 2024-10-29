@@ -114,6 +114,7 @@ func main() {
 				}
 				go sendMessage(message)
 			}
+			return
 		} else if update.Message != nil {
 			chatData := getChatData(update.Message.Chat.Id)
 			if chatData == nil {
@@ -384,6 +385,7 @@ func main() {
 				go sendMessage(message)
 				return
 			}
+			return
 		}
 		writer.WriteHeader(200)
 	})
