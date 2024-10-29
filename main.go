@@ -220,7 +220,9 @@ func main() {
 				go sendMessage(message)
 				return
 			}
-			if update.Message.Text == "/random" || update.Message.Text == "/random@"+BotName || update.Message.Text == randomVerseTextMessage {
+			if update.Message.Text == "/random" || update.Message.Text == "/random@"+BotName ||
+					update.Message.Text == "/verse" || update.Message.Text == "/verse@"+BotName ||
+					update.Message.Text == randomVerseTextMessage {
 				message := SendMessage{
 					ChatId: update.Message.Chat.Id,
 					Text:   bible.getRandomVerse(),

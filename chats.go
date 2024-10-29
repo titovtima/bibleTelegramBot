@@ -107,13 +107,11 @@ var nextRandomReplyMarkup = ReplyKeyboardMarkup{[][]KeyboardButton{{{randomVerse
 func getStartMessage(chatId int64) SendMessage {
 	return SendMessage{
 		ChatId: chatId,
-		Text: escapingSymbols("Добро пожаловать! Я - бот для отправки случайных стихов из Библии. Например:\n\n" + getRandomVerseFromList(2) +
-			"\n\nЧтобы получить случайный стих, используйте команду /random, или напишите \"" + randomVerseTextMessage + "\" (можете использовать кнопку).\n\n" +
-			"Можете настроить расписания получения случайных стихов с помощью команд /getregular, /addregular, /removeregular, /clearregular.\n\n") +
-			"По умолчанию установлен часовой пояс `Europe/Moscow` \\(UTC\\+3\\)\\. " + 
-			"Можете отправить геопозицию для определения вашего часового пояса, ввести название вручную, выбрать разницу с UTC, " +
-			"или использовать /cancel для сохранения `Europe/Moscow`\\.\n\n" +
-			"Вы можете использовать команды /gettimezone и /settimezone для просмотра и смены часового пояса\\.",
+		Text: escapingSymbols(getRandomVerseFromList(2) + "\n———————\n" +
+			"Добро пожаловать в бот отправки случайных стихов из Библии.\n\n" +
+			"Настройки дневного расписания автоматического получения случайных стихов в Меню (левый нижний угол)." + 
+			"Сейчас вы получаете один случайный индивидуальный стих в случайное время дня с 9 утра до 8 вечера.\n\n" +
+			"Выберете свой часовой пояс из кнопок ниже и нажмите большую кнопку, которая появится."),
 		ReplyMarkup: chooseTimezoneKeyboard,
 		ParseMode: "MarkdownV2",
 	}
