@@ -104,6 +104,15 @@ func main() {
 					ParseMode: "MarkdownV2",
 				}
 				go sendMessage(message)
+			} else if update.CallbackQuery.Data == "addcron 5" {
+				chatData.MessageStatus = MessageStatusAddCron5
+				saveChatsDataToFile()
+				message := SendMessage{
+					ChatId: update.CallbackQuery.Message.Chat.Id,
+					Text: "Введите время начала и конца промежутка в формате `чч:мм, чч:мм`\\. Например: `07:40, 18:03`\\.",
+					ParseMode: "MarkdownV2",
+				}
+				go sendMessage(message)
 			} else if len(update.CallbackQuery.Data) > 11 && update.CallbackQuery.Data[:11] == "removecron:" {
 				removeCronForChat(update.CallbackQuery.Message.Chat.Id, update.CallbackQuery.Data[11:])
 				message := SendMessage{
@@ -143,6 +152,7 @@ func main() {
 					ReplyMarkup: InlineKeyboardMarkup{[][]InlineKeyboardButton{
 						{{"Раз в день", "addcron 1"}, {"Несколько раз в день", "addcron 2"}},
 						{{"Раз в неделю", "addcron 3"}, {"Несколько раз в неделю", "addcron 4"}},
+						{{"Случайно в промежутке, каждый день", "addcron 5"}},
 						{{"Задать строку cron", "addcron cron"}},
 					}},
 				}
@@ -318,6 +328,11 @@ func main() {
 					}
 					go sendMessage(message)
 					return
+				}
+			}
+			if chatData.MessageStatus == MessageStatusAddCron5 {
+				if update.Message.Text != "" {
+
 				}
 			}
 			if chatData.MessageStatus == MessageStatusSetTimezone {

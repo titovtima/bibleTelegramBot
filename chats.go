@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -14,6 +15,7 @@ const defaultTimezone = "Europe/Moscow"
 
 var chatsData []ChatData
 var chatsCronJobsIds = make(map[int64]map[string]uuid.UUID)
+var chatsRandomTimeJobsIds = make(map[int64]map[int]uuid.UUID)
 
 type MessageStatus int
 
@@ -24,13 +26,22 @@ const (
 	MessageStatusAddCron3    MessageStatus = 3
 	MessageStatusAddCron4    MessageStatus = 4
 	MessageStatusAddCronCron MessageStatus = 5
+	MessageStatusAddCron5    MessageStatus = 6
 	MessageStatusSetTimezone MessageStatus = 20
 )
+
+type RandomTimeVerse struct{
+	Id        int
+	StartTime time.Time
+	Duration  int
+	NextSends []time.Time
+}
 
 type ChatData struct {
 	ChatId        int64
 	MessageStatus MessageStatus
 	VersesCrons   []string
+	RandomTime    []RandomTimeVerse
 	Timezone      string
 }
 
@@ -91,7 +102,7 @@ func saveChatsDataToFile() error {
 func getChatData(chatId int64) *ChatData {
 	ind := slices.IndexFunc(chatsData, func(cd ChatData) bool { return cd.ChatId == chatId })
 	if ind == -1 {
-		data := ChatData{chatId, MessageStatusDefault, []string{}, defaultTimezone}
+		data := ChatData{chatId, MessageStatusDefault, []string{}, []RandomTimeVerse{}, defaultTimezone}
 		chatsData = append(chatsData, data)
 		saveChatsDataToFile()
 		chatsCronJobsIds[chatId] = make(map[string]uuid.UUID)
