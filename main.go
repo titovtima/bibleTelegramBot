@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -21,8 +22,19 @@ func main() {
 	println(getRandomVerseFromList(1))
 	createWebhook()
 
-	var err error
-	scheduler, err = gocron.NewScheduler()
+	statsTimezone := defaultTimezone
+	loc, err := time.LoadLocation(statsTimezone)
+	if err != nil {
+		panic(err)
+	}
+	statsLocation = loc
+
+	schedulerTimezone := defaultTimezone
+	location, err := time.LoadLocation(schedulerTimezone)
+	if err != nil {
+		panic(err)
+	}
+	scheduler, err = gocron.NewScheduler(gocron.WithLocation(location))
 	if err != nil {
 		panic(err)
 	}
@@ -32,6 +44,7 @@ func main() {
 
 	readChatsDataFromFile()
 	readTimezonesDiffsFile()
+	readStatsFile()
 
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		body, err := io.ReadAll(request.Body)
@@ -123,6 +136,14 @@ func main() {
 				return
 			}
 			writer.WriteHeader(200)
+
+			currentDay := getCurrentStatsDay()
+			dayStats := statsFile[currentDay]
+			dayStats.MessagesReceived++
+			if slices.Index(dayStats.ChatsReceived, chatData.ChatId) == -1 {
+				dayStats.ChatsReceived = append(dayStats.ChatsReceived, chatData.ChatId)
+			}
+
 			if update.Message.Text == "/cancel" || update.Message.Text == "/cancel@"+BotName {
 				if chatData.MessageStatus != MessageStatusDefault {
 					chatData.MessageStatus = MessageStatusDefault
@@ -137,6 +158,7 @@ func main() {
 				return
 			}
 			if update.Message.Text == "/addregular" || update.Message.Text == "/addregular@"+BotName {
+				dayStats.Commands.AddRegular++
 				message := SendMessage{
 					ChatId: update.Message.Chat.Id,
 					Text:   "Выберите периодичность",
@@ -150,6 +172,7 @@ func main() {
 				return
 			}
 			if update.Message.Text == "/getregular" || update.Message.Text == "/getregular@"+BotName {
+				dayStats.Commands.GetRegular++
 				crons := chatData.VersesCrons
 				text := "Текущие расписания"
 				for _, cron := range crons {
@@ -166,6 +189,7 @@ func main() {
 				return
 			}
 			if update.Message.Text == "/getregularcron" || update.Message.Text == "/getregularcron@"+BotName {
+				dayStats.Commands.GetRegularCron++
 				crons := chatData.VersesCrons
 				text := "Текущая рассылка\n`"
 				for i, cron := range crons {
@@ -187,6 +211,7 @@ func main() {
 				return
 			}
 			if update.Message.Text == "/removeregular" || update.Message.Text == "/removeregular@"+BotName {
+				dayStats.Commands.RemoveRegular++
 				crons := chatData.VersesCrons
 				if len(crons) == 0 {
 					message := SendMessage{
@@ -210,6 +235,7 @@ func main() {
 				return
 			}
 			if update.Message.Text == "/clearregular" || update.Message.Text == "/clearregular@"+BotName {
+				dayStats.Commands.ClearRegular++
 				clearCronsForChat(update.Message.Chat.Id, false)
 				message := SendMessage{
 					ChatId:    update.Message.Chat.Id,
@@ -220,6 +246,7 @@ func main() {
 				return
 			}
 			if update.Message.Text == "/random" || update.Message.Text == "/random@"+BotName {
+				dayStats.Commands.Random++
 				message := SendMessage{
 					ChatId: update.Message.Chat.Id,
 					Text:   bible.getRandomVerse(),
@@ -228,6 +255,7 @@ func main() {
 				return
 			}
 			if update.Message.Text == "/settimezone" || update.Message.Text == "/settimezone@"+BotName {
+				dayStats.Commands.SetTimezone++
 				chatData.MessageStatus = MessageStatusSetTimezone
 				saveChatsDataToFile()
 				if update.Message.Chat.ChatType == ChatTypePrivate {
@@ -255,6 +283,7 @@ func main() {
 				}
 			}
 			if update.Message.Text == "/gettimezone" || update.Message.Text == "/gettimezone@"+BotName {
+				dayStats.Commands.GetTimezone++
 				message := SendMessage{
 					ChatId:    update.Message.Chat.Id,
 					Text:      fmt.Sprintf("Текущий часовой пояс: `%s`", displayTimezone(chatData.Timezone)),
@@ -264,6 +293,7 @@ func main() {
 				return
 			}
 			if update.Message.Text == "/start" || update.Message.Text == "/start@"+BotName {
+				dayStats.Commands.Start++
 				message := getStartMessage(update.Message.Chat.Id)
 				go sendMessage(message)
 				chatData.MessageStatus = MessageStatusSetTimezone

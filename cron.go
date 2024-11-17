@@ -231,6 +231,9 @@ func randomVerseTask(chatId int64) {
 		ChatId: chatId,
 		Text:   bible.getRandomVerse(),
 	}
+	currentDay := getCurrentStatsDay()
+	dayStats := statsFile[currentDay]
+	dayStats.ScheduledSent++
 	go sendMessage(message)
 }
 
