@@ -176,9 +176,14 @@ func saveStatsFile() error {
 
 var statsLocation *time.Location
 
-func getCurrentStatsDay() string {
+func getCurrentDayStats() *DayStats {
 	now := time.Now().In(statsLocation)
-	return strconv.Itoa(now.Local().Year()) + "-" + strconv.Itoa(int(now.Local().Month())) + "-" + strconv.Itoa(now.Local().Day())
+	dayString := strconv.Itoa(now.Local().Year()) + "-" + strconv.Itoa(int(now.Local().Month())) + "-" + strconv.Itoa(now.Local().Day())
+	if statsFile[dayString] == nil {
+		var dayStats DayStats
+		statsFile[dayString] = &dayStats
+	}
+	return statsFile[dayString]
 }
 
 func getStartMessage(chatId int64) SendMessage {

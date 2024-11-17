@@ -138,8 +138,7 @@ func main() {
 			}
 			writer.WriteHeader(200)
 
-			currentDay := getCurrentStatsDay()
-			dayStats := statsFile[currentDay]
+			dayStats := getCurrentDayStats()
 			dayStats.MessagesReceived++
 			if slices.Index(dayStats.ChatsReceived, chatData.ChatId) == -1 {
 				dayStats.ChatsReceived = append(dayStats.ChatsReceived, chatData.ChatId)
