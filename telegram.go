@@ -178,8 +178,7 @@ func sendMessage(m SendMessage) {
 		println(err)
 		return
 	}
-	currentDay := getCurrentStatsDay()
-	dayStats := statsFile[currentDay]
+	dayStats := getCurrentDayStats()
 	dayStats.MessagesSent++
 	if slices.Index(dayStats.ChatsSent, m.ChatId) == -1 {
 		dayStats.ChatsSent = append(dayStats.ChatsSent, m.ChatId)
