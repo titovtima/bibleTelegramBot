@@ -5,12 +5,15 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 )
 
 const chatsDataFileName = "chatsData.json"
 const defaultTimezone = "Europe/Moscow"
+const statsFileName = "stats.json"
 
 var chatsData []ChatData
 var chatsCronJobsIds = make(map[int64]map[string]uuid.UUID)
@@ -104,6 +107,80 @@ func getChatData(chatId int64) *ChatData {
 const randomVerseTextMessage = "Следующий случайный стих"
 var nextRandomReplyMarkup = ReplyKeyboardMarkup{[][]KeyboardButton{{{randomVerseTextMessage, false}}}}
 
+type DayStats struct {
+	MessagesSent     int64
+	MessagesReceived int64
+	ChatsSent        []int64
+	ChatsReceived    []int64
+	ScheduledSent    int64
+	Commands         CommandsDayStats
+}
+
+type CommandsDayStats struct {
+	Random         int64
+	GetRegular     int64
+	AddRegular     int64
+	RemoveRegular  int64
+	ClearRegular   int64
+	GetTimezone    int64
+	SetTimezone    int64
+	GetRegularCron int64
+	Start          int64
+}
+
+type StatsFile map[string]*DayStats
+
+var statsFile StatsFile
+
+func readStatsFile() {
+	fi, err := os.Open(statsFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := fi.Close(); err != nil {
+			panic(err)
+		}
+	}()
+
+	b, err := io.ReadAll(fi)
+	if err != nil {
+		panic(err)
+	}
+
+	err = json.Unmarshal(b, &statsFile)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func saveStatsFile() error {
+	fo, err := os.Create(statsFileName)
+	if err != nil {
+		return err
+	}
+
+	data := statsFile
+	b, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	_, err = fo.Write(b)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+var statsLocation *time.Location
+
+func getCurrentStatsDay() string {
+	now := time.Now().In(statsLocation)
+	return strconv.Itoa(now.Local().Year()) + "-" + strconv.Itoa(int(now.Local().Month())) + "-" + strconv.Itoa(now.Local().Day())
+}
+
 func getStartMessage(chatId int64) SendMessage {
 	return SendMessage{
 		ChatId: chatId,
@@ -113,6 +190,6 @@ func getStartMessage(chatId int64) SendMessage {
 			"Сейчас вы получаете один случайный индивидуальный стих в случайное время дня с 9 утра до 8 вечера.\n\n" +
 			"Выберете свой часовой пояс из кнопок ниже и нажмите большую кнопку, которая появится."),
 		ReplyMarkup: chooseTimezoneKeyboard,
-		ParseMode: "MarkdownV2",
+		ParseMode:   "MarkdownV2",
 	}
 }

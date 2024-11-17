@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
+	"slices"
 	"strings"
 )
 
@@ -76,7 +77,7 @@ type WebhookResponse struct {
 }
 
 type Update struct {
-	UpdateId      int            `json:"update_id"`
+	UpdateId      int `json:"update_id"`
 	Message       *Message
 	CallbackQuery *CallbackQuery `json:"callback_query"`
 }
@@ -104,7 +105,7 @@ type SendMessage struct {
 	Entities           []MessageEntity    `json:"entities,omitempty"`
 }
 
-type ReplyMarkup interface { ImplementsReplyMarkup() }
+type ReplyMarkup interface{ ImplementsReplyMarkup() }
 
 type KeyboardButton struct {
 	Text            string `json:"text"`
@@ -114,6 +115,7 @@ type KeyboardButton struct {
 type ReplyKeyboardMarkup struct {
 	Keyboard [][]KeyboardButton `json:"keyboard"`
 }
+
 func (r ReplyKeyboardMarkup) ImplementsReplyMarkup() {}
 
 type InlineKeyboardButton struct {
@@ -124,12 +126,15 @@ type InlineKeyboardButton struct {
 type InlineKeyboardMarkup struct {
 	InlineKeyboard [][]InlineKeyboardButton `json:"inline_keyboard"`
 }
+
 func (i InlineKeyboardMarkup) ImplementsReplyMarkup() {}
 
 type ReplyKeyboardRemoveType struct {
 	RemoveKeyboard bool `json:"remove_keyboard"`
 }
+
 func (r ReplyKeyboardRemoveType) ImplementsReplyMarkup() {}
+
 var ReplyKeyboardRemove = ReplyKeyboardRemoveType{true}
 
 func createWebhook() {
@@ -173,6 +178,13 @@ func sendMessage(m SendMessage) {
 		println(err)
 		return
 	}
+	currentDay := getCurrentStatsDay()
+	dayStats := statsFile[currentDay]
+	dayStats.MessagesSent++
+	if slices.Index(dayStats.ChatsSent, m.ChatId) == -1 {
+		dayStats.ChatsSent = append(dayStats.ChatsSent, m.ChatId)
+	}
+	saveStatsFile()
 }
 
 func escapingSymbols(str string) string {
