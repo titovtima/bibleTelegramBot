@@ -307,6 +307,23 @@ func main() {
 					return
 				}
 			}
+			if (len(update.Message.Text) > 5 && update.Message.Text[:6] == "/stats") || 
+					(len(update.Message.Text) > 6 + len(BotName) && update.Message.Text[:7+len(BotName)] == "/stats@"+BotName) {
+				if update.Message.From.Id == adminId {
+					args := strings.Split(update.Message.Text, " ")
+					startDate := "2024-11-17"
+					endDate := formatDate(time.Now())
+					if len(args) > 2 {
+						endDate = args[2]
+					}
+					if len(args) > 1 {
+						startDate = args[1]
+					}
+					message := getStatsMessage(update.Message.Chat.Id, startDate, endDate, "none")
+					go sendMessage(message)
+					return
+				}
+			}
 			if update.Message.Text == "/start" || update.Message.Text == "/start@"+BotName {
 				dayStats.Commands.Start++
 				message := getStartMessage(update.Message.Chat.Id)

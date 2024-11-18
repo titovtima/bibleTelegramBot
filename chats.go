@@ -29,6 +29,7 @@ const (
 	MessageStatusAddCronCron MessageStatus = 5
 	MessageStatusSetTimezone MessageStatus = 20
 	MessageStatusBroadcast   MessageStatus = 10000
+	MessageStatusGetStats    MessageStatus = 10001
 )
 
 type ChatData struct {
@@ -178,12 +179,54 @@ var statsLocation *time.Location
 
 func getCurrentDayStats() *DayStats {
 	now := time.Now().In(statsLocation)
-	dayString := strconv.Itoa(now.Local().Year()) + "-" + strconv.Itoa(int(now.Local().Month())) + "-" + strconv.Itoa(now.Local().Day())
+	dayString := formatDate(now)
 	if statsFile[dayString] == nil {
 		var dayStats DayStats
 		statsFile[dayString] = &dayStats
 	}
 	return statsFile[dayString]
+}
+
+func formatDate(t time.Time) string {
+	return strconv.Itoa(t.Local().Year()) + "-" + strconv.Itoa(int(t.Local().Month())) + "-" + strconv.Itoa(t.Local().Day())
+}
+
+func getStatsMessage(chatId int64, startDate string, endDate string, groupBy string) SendMessage {
+	m := statsFile
+	filtered := make(map[string]*DayStats)
+	for day, stats := range m {
+		if day >= startDate && day <= endDate {
+			filtered[day] = stats
+		}
+	}
+	m = filtered
+	if groupBy == "week" {
+
+	}
+	text := "*Общее количество пользователей: " + strconv.Itoa(len(chatsData)) + "*\n\n"
+	text += "*Отправленные сообщения*\n"
+	for period, stats := range m {
+		text += escapingSymbols(period) + ": " + strconv.FormatInt(stats.MessagesSent, 10) + "\n"
+	}
+	text += "\n*Активных чатов*\n"
+	for period, stats := range m {
+		text += escapingSymbols(period) + ": " + strconv.Itoa(len(stats.ChatsSent)) + "\n"
+	}
+	text += "\n*Отправлено случайных стихов по расписанию*\n"
+	for period, stats := range m {
+		text += escapingSymbols(period) + ": " + strconv.FormatInt(stats.ScheduledSent, 10) + "\n"
+	}
+	text += "\n*Отправлено случайных стихов по запросу*\n"
+	for period, stats := range m {
+		text += escapingSymbols(period) + ": " + strconv.FormatInt(stats.Commands.Random, 10) + "\n"
+	}
+
+	return SendMessage{
+		ChatId: chatId,
+		Text: text,
+		ParseMode: "MarkdownV2",
+		ReplyMarkup: nextRandomReplyMarkup,
+	}
 }
 
 func getStartMessage(chatId int64) SendMessage {
