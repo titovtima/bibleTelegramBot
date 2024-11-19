@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"sort"
 	"strconv"
 	"time"
 
@@ -191,34 +192,44 @@ func formatDate(t time.Time) string {
 	return strconv.Itoa(t.Local().Year()) + "-" + strconv.Itoa(int(t.Local().Month())) + "-" + strconv.Itoa(t.Local().Day())
 }
 
+type DayStatsWithDate struct {
+	Stats *DayStats
+	Date  string
+}
+
+type DayStatsWithDateArray []DayStatsWithDate
+
+func (dsArr DayStatsWithDateArray) Len() int { return len(dsArr) }
+func (dsArr DayStatsWithDateArray) Less(i, j int) bool { return dsArr[i].Date < dsArr[j].Date }
+func (dsArr DayStatsWithDateArray) Swap(i, j int) { dsArr[i], dsArr[j] = dsArr[j], dsArr[i] }
+
 func getStatsMessage(chatId int64, startDate string, endDate string, groupBy string) SendMessage {
-	m := statsFile
-	filtered := make(map[string]*DayStats)
-	for day, stats := range m {
+	var m DayStatsWithDateArray
+	for day, stats := range statsFile {
 		if day >= startDate && day <= endDate {
-			filtered[day] = stats
+			m = append(m, DayStatsWithDate{stats, day})
 		}
 	}
-	m = filtered
+	sort.Sort(m)
 	if groupBy == "week" {
 
 	}
 	text := "*Общее количество пользователей: " + strconv.Itoa(len(chatsData)) + "*\n\n"
 	text += "*Отправленные сообщения*\n"
-	for period, stats := range m {
-		text += escapingSymbols(period) + ": " + strconv.FormatInt(stats.MessagesSent, 10) + "\n"
+	for _, stats := range m {
+		text += escapingSymbols(stats.Date) + ": " + strconv.FormatInt(stats.Stats.MessagesSent, 10) + "\n"
 	}
 	text += "\n*Активных чатов*\n"
-	for period, stats := range m {
-		text += escapingSymbols(period) + ": " + strconv.Itoa(len(stats.ChatsSent)) + "\n"
+	for _, stats := range m {
+		text += escapingSymbols(stats.Date) + ": " + strconv.Itoa(len(stats.Stats.ChatsSent)) + "\n"
 	}
 	text += "\n*Отправлено случайных стихов по расписанию*\n"
-	for period, stats := range m {
-		text += escapingSymbols(period) + ": " + strconv.FormatInt(stats.ScheduledSent, 10) + "\n"
+	for _, stats := range m {
+		text += escapingSymbols(stats.Date) + ": " + strconv.FormatInt(stats.Stats.ScheduledSent, 10) + "\n"
 	}
 	text += "\n*Отправлено случайных стихов по запросу*\n"
-	for period, stats := range m {
-		text += escapingSymbols(period) + ": " + strconv.FormatInt(stats.Commands.Random, 10) + "\n"
+	for _, stats := range m {
+		text += escapingSymbols(stats.Date) + ": " + strconv.FormatInt(stats.Stats.Commands.Random, 10) + "\n"
 	}
 
 	return SendMessage{
