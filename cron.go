@@ -59,16 +59,6 @@ type Time struct {
 	Minutes int
 }
 
-func getTimesDiff(start Time, end Time) int {
-	diff := (end.Hours - start.Hours) * 60 + end.Minutes - start.Minutes
-	if diff < 0 { diff += 60 * 24 }
-	return diff
-}
-
-func timeAddMinutes(start Time, duration int) Time {
-	return Time{start.Hours + (start.Minutes + duration) / 60, (start.Minutes + duration) % 60}
-}
-
 func parseTime(timeInput string) (*Time, error) {
 	spl := strings.Split(strings.Trim(timeInput, " "), ":")
 	if len(spl) != 2 {
@@ -247,21 +237,26 @@ func randomVerseTask(chatId int64) {
 }
 
 func setDailyRandomTimeTasks() {
-
+	now := time.Now()
 	for _, chatData := range chatsData {
 		for _, randomTime := range chatData.RandomTime {
 			duration := rand.Intn(randomTime.Duration)
-			newTime := randomTime.StartTime.Add(time.Duration(duration) * time.Minute)
+			loc, err := time.LoadLocation(chatData.Timezone)
+			if err != nil {
+				loc = defaultLocation
+			}
+			newTime := time.Date(now.Year(), now.Month(), now.Day() + 1, 0, 0, 0, 0, loc).Add(time.Duration(duration) * time.Minute)
 			randomTime.NextSends = append(randomTime.NextSends, newTime)
 			job, err := scheduler.NewJob(gocron.OneTimeJob(gocron.OneTimeJobStartDateTime(newTime)),
 				gocron.NewTask(func () {
 					randomVerseTask(chatData.ChatId)
-					randomTime.NextSends = filter(randomTime.NextSends, func(t time.Time) bool {t.Sub(time.Parse())})
+					randomTime.NextSends = filter(randomTime.NextSends, func(t time.Time) bool { return t.Sub(newTime) == 0; })
+					delete(chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id], newTime)
 				}))
 			if err != nil {
 				println(err)
 			} else {
-				chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id] = job.ID()
+				chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id][newTime] = job.ID()
 			}
 		}
 	}
@@ -271,44 +266,21 @@ func setDailyRandomTimeTasks() {
 func createRandomTimeJobsAfterRestart() {
 	for _, chatData := range chatsData {
 		for _, randomTime := range chatData.RandomTime {
-			randomTime.Today = newTime
-			job, err := scheduler.NewJob(gocron.OneTimeJob(gocron.OneTimeJobStartDateTime(
-				time.Now().
-					Add(time.Duration(randomTime.StartTime.Hours) * time.Hour).
-					Add(time.Duration(randomTime.StartTime.Minutes) * time.Minute).
-					Add(time.Duration(duration + 1) * time.Minute))),
-				gocron.NewTask(func ()  {
-					randomVerseTask(chatData.ChatId)
-					randomTime.Today = nil
-				}))
-			if err != nil {
-				println(err)
-			} else {
-				chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id] = job.ID()
+			for _, send := range randomTime.NextSends {
+				job, err := scheduler.NewJob(gocron.OneTimeJob(gocron.OneTimeJobStartDateTime(send)),
+					gocron.NewTask(func () {
+						randomVerseTask(chatData.ChatId)
+						randomTime.NextSends = filter(randomTime.NextSends, func(t time.Time) bool { return t.Sub(send) == 0; })
+						delete(chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id], send)
+					}))
+				if err != nil {
+					println("error creating random time job", err)
+				}
+				chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id][send] = job.ID()
 			}
 		}
 	}
 }
-
-func randomTimeTask(chatId int64, duration int) {
-	duration = rand.Intn(duration+1)
-	var job gocron.Job
-	var err error
-	job, err = scheduler.NewJob(gocron.OneTimeJob(
-		gocron.OneTimeJobStartDateTime(time.Now().Add(time.Duration(duration) * time.Minute))), 
-		gocron.NewTask(func ()  {
-			randomVerseTask(chatId)
-			scheduler.RemoveJob(job.ID())
-		}),
-	)
-	if err != nil {
-		println(err)
-		return
-	}
-	
-}
-
-func 
 
 func clearCronsForChat(chatId int64, onlyJobs bool) {
 	idsList := chatsCronJobsIds[chatId]

@@ -22,6 +22,10 @@ func main() {
 	createWebhook()
 
 	var err error
+	defaultLocation, err = time.LoadLocation(defaultTimezone)
+	if err != nil {
+		panic(err)
+	}
 	scheduler, err = gocron.NewScheduler()
 	if err != nil {
 		panic(err)
@@ -32,6 +36,10 @@ func main() {
 
 	readChatsDataFromFile()
 	readTimezonesDiffsFile()
+	createRandomTimeJobsAfterRestart()
+	scheduler.NewJob(gocron.CronJob("0 3 * * *", false), gocron.NewTask(func ()  {
+		setDailyRandomTimeTasks()
+	}))
 
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		body, err := io.ReadAll(request.Body)

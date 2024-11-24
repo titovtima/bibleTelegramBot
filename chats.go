@@ -12,10 +12,11 @@ import (
 
 const chatsDataFileName = "chatsData.json"
 const defaultTimezone = "Europe/Moscow"
+var defaultLocation *time.Location
 
 var chatsData []ChatData
 var chatsCronJobsIds = make(map[int64]map[string]uuid.UUID)
-var chatsRandomTimeJobsIds = make(map[int64]map[int]uuid.UUID)
+var chatsRandomTimeJobsIds = make(map[int64]map[int]map[time.Time]uuid.UUID)
 
 type MessageStatus int
 
@@ -32,7 +33,7 @@ const (
 
 type RandomTimeVerse struct{
 	Id        int
-	StartTime time.Time
+	StartTime Time
 	Duration  int
 	NextSends []time.Time
 }
