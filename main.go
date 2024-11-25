@@ -117,7 +117,8 @@ func main() {
 				saveChatsDataToFile()
 				message := SendMessage{
 					ChatId: update.CallbackQuery.Message.Chat.Id,
-					Text: "Введите время начала и конца промежутка в формате `чч:мм, чч:мм`\\. Например: `07:40, 18:03`\\.",
+					Text: "Введите время начала и конца промежутка для отправки в случайное время " +
+						"в формате `чч:мм, чч:мм`\\. Например: `07:40, 18:03`\\.",
 					ParseMode: "MarkdownV2",
 				}
 				go sendMessage(message)
@@ -340,7 +341,24 @@ func main() {
 			}
 			if chatData.MessageStatus == MessageStatusAddCron5 {
 				if update.Message.Text != "" {
-
+					times, err := parseListTimes(update.Message.Text)
+					if err != nil || len(times) != 2 {
+						message := SendMessage{
+							ChatId: update.Message.Chat.Id,
+							Text:   "Некорректный формат. Попробуйте ещё раз",
+						}
+						go sendMessage(message)
+						return
+					}
+					addRandomTimeRegular(chatData.ChatId, times[0], times[1])
+					chatData.MessageStatus = MessageStatusDefault
+					saveChatsDataToFile()
+					message := SendMessage{
+						ChatId: update.Message.Chat.Id,
+						Text:   "Расписание успешно добавлено",
+					}
+					go sendMessage(message)
+					return
 				}
 			}
 			if chatData.MessageStatus == MessageStatusSetTimezone {

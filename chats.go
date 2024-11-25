@@ -16,7 +16,7 @@ var defaultLocation *time.Location
 
 var chatsData []ChatData
 var chatsCronJobsIds = make(map[int64]map[string]uuid.UUID)
-var chatsRandomTimeJobsIds = make(map[int64]map[int]map[time.Time]uuid.UUID)
+var chatsRandomTimeJobsIds = make(map[int64]map[int]map[string]uuid.UUID)
 
 type MessageStatus int
 
