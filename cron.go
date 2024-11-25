@@ -242,7 +242,7 @@ func randomVerseTask(chatId int64) {
 	go sendMessage(message)
 }
 
-func addRandomTimeForDay(day time.Time, randomTime RandomTimeVerse, chatData ChatData, jobsIdsMap map[string]uuid.UUID) {
+func addRandomTimeForDay(day time.Time, randomTime RandomTimeVerse, chatData ChatData) {
 	duration := rand.Intn(randomTime.Duration) + 1
 	loc, err := time.LoadLocation(chatData.Timezone)
 	if err != nil {
@@ -275,7 +275,7 @@ func setDailyRandomTimeTasks() {
 	now := time.Now()
 	for _, chatData := range chatsData {
 		for _, randomTime := range chatData.RandomTime {
-			addRandomTimeForDay(now, randomTime, chatData, chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id])
+			addRandomTimeForDay(now, randomTime, chatData)
 		}
 	}
 	saveChatsDataToFile()
@@ -313,9 +313,8 @@ func addRandomTimeRegular(chatId int64, startTime Time, endTime Time) {
 	if err != nil { loc = defaultLocation }
 	now = now.In(loc)
 	chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id] = make(map[string]uuid.UUID)
-	addRandomTimeForDay(now, randomTime, chatData, chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id])
-	addRandomTimeForDay(time.Date(now.Year(), now.Month(), now.Day() + 1, 0, 0, 0, 0, loc),
-		randomTime, chatData, chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id])
+	addRandomTimeForDay(now, randomTime, chatData)
+	addRandomTimeForDay(time.Date(now.Year(), now.Month(), now.Day() + 1, 0, 0, 0, 0, loc), randomTime, chatData)
 	saveChatsDataToFile()
 }
 
