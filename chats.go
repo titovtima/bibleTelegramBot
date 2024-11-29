@@ -33,6 +33,7 @@ const (
 
 type RandomTimeVerse struct{
 	Id        int
+	WeekDay   int
 	StartTime Time
 	Duration  int
 	NextSends []time.Time
@@ -76,6 +77,7 @@ func readChatsDataFromFile() {
 
 	for _, chatData := range chatsData {
 		chatsCronJobsIds[chatData.ChatId] = make(map[string]uuid.UUID)
+		chatsRandomTimeJobsIds[chatData.ChatId] = make(map[int]map[string]uuid.UUID)
 		addCronsForChat(chatData.VersesCrons, chatData.ChatId, true)
 	}
 }
@@ -107,6 +109,7 @@ func getChatData(chatId int64) *ChatData {
 		chatsData = append(chatsData, data)
 		saveChatsDataToFile()
 		chatsCronJobsIds[chatId] = make(map[string]uuid.UUID)
+		chatsRandomTimeJobsIds[chatId] = make(map[int]map[string]uuid.UUID)
 		return &data
 	}
 	return &chatsData[ind]

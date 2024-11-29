@@ -60,9 +60,13 @@ type Time struct {
 }
 
 func substractTimes (a Time, b Time) int {
-	res := b.Minutes - a.Minutes + 60 * (b.Hours - a.Hours)
+	res := a.Minutes - b.Minutes + 60 * (a.Hours - b.Hours)
 	if res < 0 { res += 24 * 60 }
 	return res
+}
+
+func (t *Time) addDuration(duration int) Time {
+	return Time{(t.Hours + (t.Minutes + duration) / 60) % 24, (t.Minutes + duration) % 60}
 }
 
 func parseTime(timeInput string) (*Time, error) {
@@ -177,8 +181,6 @@ func parseListWeekDayTimesToCron(timeInput string) ([]string, error) {
 	return list, nil
 }
 
-
-
 var weekDaysNames = []string{
 	"Каждое воскресенье",
 	"Каждый понедельник",
@@ -217,6 +219,20 @@ func cronToString(cron string) string {
 	return cron
 }
 
+func randomTimeToString(randomTime RandomTimeVerse) string {
+	endTime := randomTime.StartTime.addDuration(randomTime.Duration)
+	return "Каждый день в случайное время с " +
+		strconv.Itoa(randomTime.StartTime.Hours) + ":" + strconv.Itoa(randomTime.StartTime.Minutes) + " до " +
+		strconv.Itoa(endTime.Hours) + ":" + strconv.Itoa(endTime.Minutes)
+}
+
+func randomTimeToShortString(randomTime RandomTimeVerse) string {
+	endTime := randomTime.StartTime.addDuration(randomTime.Duration)
+	return "Случайно с " +
+		strconv.Itoa(randomTime.StartTime.Hours) + ":" + strconv.Itoa(randomTime.StartTime.Minutes) + " до " +
+		strconv.Itoa(endTime.Hours) + ":" + strconv.Itoa(endTime.Minutes)
+}
+
 func addCronsForChat(crons []string, chatId int64, onlyJob bool) {
 	chatData := getChatData(chatId)
 	if !onlyJob {
@@ -227,7 +243,7 @@ func addCronsForChat(crons []string, chatId int64, onlyJob bool) {
 		job, err := scheduler.NewJob(gocron.CronJob(fmt.Sprintf("TZ=%s %s", chatData.Timezone, cron), false),
 			gocron.NewTask(randomVerseTask, chatId))
 		if err != nil {
-			println(err)
+			println(err.Error())
 			continue
 		}
 		chatsCronJobsIds[chatId][cron] = job.ID()
@@ -242,7 +258,7 @@ func randomVerseTask(chatId int64) {
 	go sendMessage(message)
 }
 
-func addRandomTimeForDay(day time.Time, randomTime RandomTimeVerse, chatData ChatData) {
+func addRandomTimeForDay(day time.Time, randomTime RandomTimeVerse, chatData *ChatData) {
 	duration := rand.Intn(randomTime.Duration) + 1
 	loc, err := time.LoadLocation(chatData.Timezone)
 	if err != nil {
@@ -265,7 +281,7 @@ func addRandomTimeForDay(day time.Time, randomTime RandomTimeVerse, chatData Cha
 			delete(chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id], dayStartTime.String()[:10])
 		}))
 	if err != nil {
-		println(err)
+		println(err.Error())
 	} else {
 		chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id][dayStartTime.String()[:10]] = job.ID()
 	}
@@ -275,7 +291,7 @@ func setDailyRandomTimeTasks() {
 	now := time.Now()
 	for _, chatData := range chatsData {
 		for _, randomTime := range chatData.RandomTime {
-			addRandomTimeForDay(now, randomTime, chatData)
+			addRandomTimeForDay(now, randomTime, &chatData)
 		}
 	}
 	saveChatsDataToFile()
@@ -292,7 +308,7 @@ func createRandomTimeJobsAfterRestart() {
 						delete(chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id], send.String()[:10])
 					}))
 				if err != nil {
-					println("error creating random time job", err)
+					println("error creating random time job", err.Error())
 				}
 				chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id][send.String()[:10]] = job.ID()
 			}
@@ -301,12 +317,12 @@ func createRandomTimeJobsAfterRestart() {
 }
 
 func addRandomTimeRegular(chatId int64, startTime Time, endTime Time) {
-	chatData := chatsData[chatId]
+	chatData := getChatData(chatId)
 	maxId := 0
 	for _, rt := range chatData.RandomTime {
 		maxId = max(maxId, rt.Id)
 	}
-	randomTime := RandomTimeVerse{maxId + 1, startTime, substractTimes(endTime, startTime), []time.Time{}}
+	randomTime := RandomTimeVerse{maxId + 1, -1, startTime, substractTimes(endTime, startTime), []time.Time{}}
 	chatData.RandomTime = append(chatData.RandomTime, randomTime)
 	now := time.Now()
 	loc, err := time.LoadLocation(chatData.Timezone)
@@ -318,23 +334,46 @@ func addRandomTimeRegular(chatId int64, startTime Time, endTime Time) {
 	saveChatsDataToFile()
 }
 
+func removeRandomTimeRegular(chatId int64, randomId int) {
+	chatData := getChatData(chatId)
+	filtered := filter(chatData.RandomTime, func(rt RandomTimeVerse) bool { return rt.Id == randomId })
+	if len(filtered) < 1 { return }
+	for _, randomTime := range filtered {
+		for _, send := range randomTime.NextSends {
+			scheduler.RemoveJob(chatsRandomTimeJobsIds[chatId][randomId][send.String()[:10]])
+		}
+		delete(chatsRandomTimeJobsIds[chatId], randomId)
+	}
+	chatData.RandomTime = filter(chatData.RandomTime, func(rt RandomTimeVerse) bool { return rt.Id != randomId })
+}
+
 func clearCronsForChat(chatId int64, onlyJobs bool) {
+	chatData := getChatData(chatId)
 	idsList := chatsCronJobsIds[chatId]
 	for _, jobId := range idsList {
 		scheduler.RemoveJob(jobId)
+	}
+	for _, rt := range chatData.RandomTime {
+		removeRandomTimeRegular(chatId, rt.Id)
 	}
 	chatsCronJobsIds[chatId] = make(map[string]uuid.UUID)
 	if !onlyJobs {
 		chatData := getChatData(chatId)
 		chatData.VersesCrons = []string{}
-		saveChatsDataToFile()
 	}
+	saveChatsDataToFile()
 }
 
 func recreateJobsForChat(chatId int64) {
 	chatData := getChatData(chatId)
+	randomTimes := []RandomTimeVerse{}
+	randomTimes = append(randomTimes, chatData.RandomTime...)
+	copy(chatData.RandomTime, randomTimes)
 	clearCronsForChat(chatId, true)
 	addCronsForChat(chatData.VersesCrons, chatId, true)
+	for _, rt := range randomTimes {
+		addRandomTimeRegular(chatId, rt.StartTime, rt.StartTime.addDuration(rt.Duration))
+	}
 }
 
 func removeCronForChat(chatId int64, cron string) {
