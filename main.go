@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,6 +30,10 @@ func main() {
 	}
 	statsLocation = loc
 
+	defaultLocation, err = time.LoadLocation(defaultTimezone)
+	if err != nil {
+		panic(err)
+	}
 	schedulerTimezone := defaultTimezone
 	location, err := time.LoadLocation(schedulerTimezone)
 	if err != nil {
@@ -45,6 +50,10 @@ func main() {
 	readChatsDataFromFile()
 	readTimezonesDiffsFile()
 	readStatsFile()
+	createRandomTimeJobsAfterRestart()
+	scheduler.NewJob(gocron.CronJob("0 3 * * *", false), gocron.NewTask(func ()  {
+		setDailyRandomTimeTasks()
+	}))
 
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		body, err := io.ReadAll(request.Body)
@@ -117,12 +126,35 @@ func main() {
 					ParseMode: "MarkdownV2",
 				}
 				go sendMessage(message)
+			} else if update.CallbackQuery.Data == "addcron 5" {
+				chatData.MessageStatus = MessageStatusAddCron5
+				saveChatsDataToFile()
+				message := SendMessage{
+					ChatId: update.CallbackQuery.Message.Chat.Id,
+					Text: "Введите время начала и конца промежутка для отправки в случайное время " +
+						"в формате `чч:мм, чч:мм`\\. Например: `07:40, 18:03`\\.",
+					ParseMode: "MarkdownV2",
+				}
+				go sendMessage(message)
 			} else if len(update.CallbackQuery.Data) > 11 && update.CallbackQuery.Data[:11] == "removecron:" {
 				removeCronForChat(update.CallbackQuery.Message.Chat.Id, update.CallbackQuery.Data[11:])
 				message := SendMessage{
 					ChatId:      update.CallbackQuery.Message.Chat.Id,
 					Text:        "Расписание `" + strings.Trim(update.CallbackQuery.Data[11:], " ") + "` удалено",
 					ParseMode:   "MarkdownV2",
+					ReplyMarkup: ReplyKeyboardRemove,
+				}
+				go sendMessage(message)
+			} else if len(update.CallbackQuery.Data) > 17 && update.CallbackQuery.Data[:17] == "removerandomtime:" {
+				id, err := strconv.Atoi(update.CallbackQuery.Data[17:])
+				if err != nil { 
+					println(err.Error())
+					return 
+				}
+				removeRandomTimeRegular(update.CallbackQuery.Message.Chat.Id, id)
+				message := SendMessage{
+					ChatId:      update.CallbackQuery.Message.Chat.Id,
+					Text:        "Расписание случайного времени отправки удалено",
 					ReplyMarkup: ReplyKeyboardRemove,
 				}
 				go sendMessage(message)
@@ -164,6 +196,7 @@ func main() {
 					ReplyMarkup: InlineKeyboardMarkup{[][]InlineKeyboardButton{
 						{{"Раз в день", "addcron 1"}, {"Несколько раз в день", "addcron 2"}},
 						{{"Раз в неделю", "addcron 3"}, {"Несколько раз в неделю", "addcron 4"}},
+						{{"Случайно в промежутке, каждый день", "addcron 5"}},
 						{{"Задать строку cron", "addcron cron"}},
 					}},
 				}
@@ -173,11 +206,14 @@ func main() {
 			if update.Message.Text == "/getregular" || update.Message.Text == "/getregular@"+BotName {
 				dayStats.Commands.GetRegular++
 				crons := chatData.VersesCrons
-				text := "Текущие расписания"
+				text := "Текущие расписания:"
 				for _, cron := range crons {
 					text += "\n" + cronToString(cron)
 				}
-				if len(crons) == 0 {
+				for _, rt := range chatData.RandomTime {
+					text += "\n" + randomTimeToString(rt)
+				}
+				if len(crons) + len(chatData.RandomTime) == 0 {
 					text = "Нет регулярных расписаний"
 				}
 				message := SendMessage{
@@ -190,7 +226,7 @@ func main() {
 			if update.Message.Text == "/getregularcron" || update.Message.Text == "/getregularcron@"+BotName {
 				dayStats.Commands.GetRegularCron++
 				crons := chatData.VersesCrons
-				text := "Текущая рассылка\n`"
+				text := "Текущие расписания:\n`"
 				for i, cron := range crons {
 					if i > 0 {
 						text += "; "
@@ -198,7 +234,10 @@ func main() {
 					text += cron
 				}
 				text += "`"
-				if len(crons) == 0 {
+				for _, rt := range chatData.RandomTime {
+					text += "\n" + randomTimeToString(rt)
+				}
+				if len(crons) + len(chatData.RandomTime) == 0 {
 					text = "Нет регулярных расписаний"
 				}
 				message := SendMessage{
@@ -212,7 +251,8 @@ func main() {
 			if update.Message.Text == "/removeregular" || update.Message.Text == "/removeregular@"+BotName {
 				dayStats.Commands.RemoveRegular++
 				crons := chatData.VersesCrons
-				if len(crons) == 0 {
+				randomTimes := chatData.RandomTime
+				if len(crons) + len(randomTimes) == 0 {
 					message := SendMessage{
 						ChatId: update.Message.Chat.Id,
 						Text:   "Нет регулярных расписаний",
@@ -224,6 +264,10 @@ func main() {
 				for _, cron := range crons {
 					replyMarkup.InlineKeyboard = append(replyMarkup.InlineKeyboard,
 						[]InlineKeyboardButton{{cronToString(cron), "removecron:" + cron}})
+				}
+				for _, randomTime := range chatData.RandomTime {
+					replyMarkup.InlineKeyboard = append(replyMarkup.InlineKeyboard,
+						[]InlineKeyboardButton{{randomTimeToShortString(randomTime), "removerandomtime:" + strconv.Itoa(randomTime.Id)}})
 				}
 				message := SendMessage{
 					ChatId:      update.Message.Chat.Id,
@@ -339,6 +383,28 @@ func main() {
 						return
 					}
 					addCronsForChat(crons, update.Message.Chat.Id, false)
+					chatData.MessageStatus = MessageStatusDefault
+					saveChatsDataToFile()
+					message := SendMessage{
+						ChatId: update.Message.Chat.Id,
+						Text:   "Расписание успешно добавлено",
+					}
+					go sendMessage(message)
+					return
+				}
+			}
+			if chatData.MessageStatus == MessageStatusAddCron5 {
+				if update.Message.Text != "" {
+					times, err := parseListTimes(update.Message.Text)
+					if err != nil || len(times) != 2 {
+						message := SendMessage{
+							ChatId: update.Message.Chat.Id,
+							Text:   "Некорректный формат. Попробуйте ещё раз",
+						}
+						go sendMessage(message)
+						return
+					}
+					addRandomTimeRegular(chatData.ChatId, times[0], times[1])
 					chatData.MessageStatus = MessageStatusDefault
 					saveChatsDataToFile()
 					message := SendMessage{

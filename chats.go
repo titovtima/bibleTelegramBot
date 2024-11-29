@@ -14,9 +14,11 @@ import (
 const chatsDataFileName = "chatsData.json"
 const defaultTimezone = "Europe/Moscow"
 const statsFileName = "stats.json"
+var defaultLocation *time.Location
 
 var chatsData []ChatData
 var chatsCronJobsIds = make(map[int64]map[string]uuid.UUID)
+var chatsRandomTimeJobsIds = make(map[int64]map[int]map[string]uuid.UUID)
 
 type MessageStatus int
 
@@ -27,13 +29,23 @@ const (
 	MessageStatusAddCron3    MessageStatus = 3
 	MessageStatusAddCron4    MessageStatus = 4
 	MessageStatusAddCronCron MessageStatus = 5
+	MessageStatusAddCron5    MessageStatus = 6
 	MessageStatusSetTimezone MessageStatus = 20
 )
+
+type RandomTimeVerse struct{
+	Id        int
+	WeekDay   int
+	StartTime Time
+	Duration  int
+	NextSends []time.Time
+}
 
 type ChatData struct {
 	ChatId        int64
 	MessageStatus MessageStatus
 	VersesCrons   []string
+	RandomTime    []RandomTimeVerse
 	Timezone      string
 }
 
@@ -67,6 +79,7 @@ func readChatsDataFromFile() {
 
 	for _, chatData := range chatsData {
 		chatsCronJobsIds[chatData.ChatId] = make(map[string]uuid.UUID)
+		chatsRandomTimeJobsIds[chatData.ChatId] = make(map[int]map[string]uuid.UUID)
 		addCronsForChat(chatData.VersesCrons, chatData.ChatId, true)
 	}
 }
@@ -94,10 +107,11 @@ func saveChatsDataToFile() error {
 func getChatData(chatId int64) *ChatData {
 	ind := slices.IndexFunc(chatsData, func(cd ChatData) bool { return cd.ChatId == chatId })
 	if ind == -1 {
-		data := ChatData{chatId, MessageStatusDefault, []string{}, defaultTimezone}
+		data := ChatData{chatId, MessageStatusDefault, []string{}, []RandomTimeVerse{}, defaultTimezone}
 		chatsData = append(chatsData, data)
 		saveChatsDataToFile()
 		chatsCronJobsIds[chatId] = make(map[string]uuid.UUID)
+		chatsRandomTimeJobsIds[chatId] = make(map[int]map[string]uuid.UUID)
 		return &data
 	}
 	return &chatsData[ind]
