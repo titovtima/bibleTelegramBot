@@ -120,7 +120,6 @@ func getChatData(chatId int64) *ChatData {
 }
 
 const randomVerseTextMessage = "Следующий случайный стих"
-var nextRandomReplyMarkup = ReplyKeyboardMarkup{[][]KeyboardButton{{{randomVerseTextMessage, false}}}}
 
 type Stats struct {
 	MessagesSent     int64
@@ -346,7 +345,7 @@ func getStatsMessage(chatId int64, startDate string, endDate string, groupBy str
 		ChatId: chatId,
 		Text: text,
 		ParseMode: "MarkdownV2",
-		ReplyMarkup: nextRandomReplyMarkup,
+		ReplyMarkup: ReplyKeyboardRemove,
 	}
 }
 
