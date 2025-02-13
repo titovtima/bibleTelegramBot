@@ -143,7 +143,7 @@ func main() {
 					ChatId:      update.CallbackQuery.Message.Chat.Id,
 					Text:        "Расписание `" + strings.Trim(update.CallbackQuery.Data[11:], " ") + "` удалено",
 					ParseMode:   "MarkdownV2",
-					ReplyMarkup: nextRandomReplyMarkup,
+					ReplyMarkup: ReplyKeyboardRemove,
 				}
 				go sendMessage(message)
 			} else if len(update.CallbackQuery.Data) > 17 && update.CallbackQuery.Data[:17] == "removerandomtime:" {
@@ -183,7 +183,7 @@ func main() {
 					message := SendMessage{
 						ChatId:      update.Message.Chat.Id,
 						Text:        "Операция отменена",
-						ReplyMarkup: nextRandomReplyMarkup,
+						ReplyMarkup: ReplyKeyboardRemove,
 					}
 					go sendMessage(message)
 				}
@@ -455,7 +455,7 @@ func main() {
 					message := SendMessage{
 						ChatId: update.Message.Chat.Id,
 						Text:   "Расписание успешно добавлено",
-						ReplyMarkup: nextRandomReplyMarkup,
+						ReplyMarkup: ReplyKeyboardRemove,
 					}
 					go sendMessage(message)
 					return
@@ -526,7 +526,7 @@ func main() {
 						ChatId:    update.Message.Chat.Id,
 						Text:      text,
 						ParseMode: "MarkdownV2",
-						ReplyMarkup: nextRandomReplyMarkup,
+						ReplyMarkup: ReplyKeyboardRemove,
 					}
 					go sendMessage(message)
 					return
@@ -543,7 +543,7 @@ func main() {
 					ChatId:      update.Message.Chat.Id,
 					Text:        text,
 					ParseMode:   "MarkdownV2",
-					ReplyMarkup: nextRandomReplyMarkup,
+					ReplyMarkup: ReplyKeyboardRemove,
 				}
 				go sendMessage(message)
 				return
@@ -556,7 +556,7 @@ func main() {
 						message := SendMessage{
 							ChatId: adminId,
 							Text: "Сообщение разослано",
-							ReplyMarkup: nextRandomReplyMarkup,
+							ReplyMarkup: ReplyKeyboardRemove,
 						}
 						go sendMessage(message)
 						return
