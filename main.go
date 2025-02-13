@@ -307,7 +307,7 @@ func main() {
 					return
 				}
 			}
-			if (len(update.Message.Text) > 5 && update.Message.Text[:6] == "/stats") || 
+			if (len(update.Message.Text) > 6 && update.Message.Text[:7] == "/stats ") || (update.Message.Text == "/stats") ||
 					(len(update.Message.Text) > 6 + len(BotName) && update.Message.Text[:7+len(BotName)] == "/stats@"+BotName) {
 				if update.Message.From.Id == adminId {
 					args := strings.Split(update.Message.Text, " ")
@@ -320,6 +320,40 @@ func main() {
 						startDate = args[1]
 					}
 					message := getStatsMessage(update.Message.Chat.Id, startDate, endDate, "none")
+					go sendMessage(message)
+					return
+				}
+			}
+			if (len(update.Message.Text) > 6 && update.Message.Text[:7] == "/statsw") ||
+					(len(update.Message.Text) > 7 + len(BotName) && update.Message.Text[:8+len(BotName)] == "/statsw@"+BotName) {
+				if update.Message.From.Id == adminId {
+					args := strings.Split(update.Message.Text, " ")
+					startDate := "2024-11-17"
+					endDate := formatDate(time.Now())
+					if len(args) > 2 {
+						endDate = args[2]
+					}
+					if len(args) > 1 {
+						startDate = args[1]
+					}
+					message := getStatsMessage(update.Message.Chat.Id, startDate, endDate, "week")
+					go sendMessage(message)
+					return
+				}
+			}
+			if (len(update.Message.Text) > 6 && update.Message.Text[:7] == "/statsm") ||
+					(len(update.Message.Text) > 7 + len(BotName) && update.Message.Text[:8+len(BotName)] == "/statsm@"+BotName) {
+				if update.Message.From.Id == adminId {
+					args := strings.Split(update.Message.Text, " ")
+					startDate := "2024-11-17"
+					endDate := formatDate(time.Now())
+					if len(args) > 2 {
+						endDate = args[2]
+					}
+					if len(args) > 1 {
+						startDate = args[1]
+					}
+					message := getStatsMessage(update.Message.Chat.Id, startDate, endDate, "month")
 					go sendMessage(message)
 					return
 				}
