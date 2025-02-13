@@ -22,6 +22,7 @@ func main() {
 	getVersesListsFromFile()
 	println(getRandomVerseFromList(1))
 	createWebhook()
+	getAdminId()
 
 	statsTimezone := defaultTimezone
 	loc, err := time.LoadLocation(statsTimezone)
@@ -142,7 +143,7 @@ func main() {
 					ChatId:      update.CallbackQuery.Message.Chat.Id,
 					Text:        "Расписание `" + strings.Trim(update.CallbackQuery.Data[11:], " ") + "` удалено",
 					ParseMode:   "MarkdownV2",
-					ReplyMarkup: ReplyKeyboardRemove,
+					ReplyMarkup: nextRandomReplyMarkup,
 				}
 				go sendMessage(message)
 			} else if len(update.CallbackQuery.Data) > 17 && update.CallbackQuery.Data[:17] == "removerandomtime:" {
@@ -182,7 +183,7 @@ func main() {
 					message := SendMessage{
 						ChatId:      update.Message.Chat.Id,
 						Text:        "Операция отменена",
-						ReplyMarkup: ReplyKeyboardRemove,
+						ReplyMarkup: nextRandomReplyMarkup,
 					}
 					go sendMessage(message)
 				}
@@ -288,7 +289,9 @@ func main() {
 				go sendMessage(message)
 				return
 			}
-			if update.Message.Text == "/random" || update.Message.Text == "/random@"+BotName {
+			if update.Message.Text == "/random" || update.Message.Text == "/random@"+BotName ||
+					update.Message.Text == "/verse" || update.Message.Text == "/verse@"+BotName ||
+					update.Message.Text == randomVerseTextMessage {
 				dayStats.Commands.Random++
 				message := SendMessage{
 					ChatId: update.Message.Chat.Id,
@@ -334,6 +337,70 @@ func main() {
 				}
 				go sendMessage(message)
 				return
+			}
+			if update.Message.Text == "/broadcast" || update.Message.Text == "/broadcast@"+BotName {
+				if update.Message.From.Id == adminId {
+					chatData.MessageStatus = MessageStatusBroadcast
+					saveChatsDataToFile()
+					message := SendMessage{
+						ChatId:    update.Message.Chat.Id,
+						Text:      "Отправьте сообщение для общей рассылки",
+						ReplyMarkup: ReplyKeyboardRemove,
+					}
+					go sendMessage(message)
+					return
+				}
+			}
+			if (len(update.Message.Text) > 6 && update.Message.Text[:7] == "/stats ") || (update.Message.Text == "/stats") ||
+					(len(update.Message.Text) > 6 + len(BotName) && update.Message.Text[:7+len(BotName)] == "/stats@"+BotName) {
+				if update.Message.From.Id == adminId {
+					args := strings.Split(update.Message.Text, " ")
+					startDate := "2024-11-17"
+					endDate := formatDate(time.Now())
+					if len(args) > 2 {
+						endDate = args[2]
+					}
+					if len(args) > 1 {
+						startDate = args[1]
+					}
+					message := getStatsMessage(update.Message.Chat.Id, startDate, endDate, "none")
+					go sendMessage(message)
+					return
+				}
+			}
+			if (len(update.Message.Text) > 6 && update.Message.Text[:7] == "/statsw") ||
+					(len(update.Message.Text) > 7 + len(BotName) && update.Message.Text[:8+len(BotName)] == "/statsw@"+BotName) {
+				if update.Message.From.Id == adminId {
+					args := strings.Split(update.Message.Text, " ")
+					startDate := "2024-11-17"
+					endDate := formatDate(time.Now())
+					if len(args) > 2 {
+						endDate = args[2]
+					}
+					if len(args) > 1 {
+						startDate = args[1]
+					}
+					message := getStatsMessage(update.Message.Chat.Id, startDate, endDate, "week")
+					go sendMessage(message)
+					return
+				}
+			}
+			if (len(update.Message.Text) > 6 && update.Message.Text[:7] == "/statsm") ||
+					(len(update.Message.Text) > 7 + len(BotName) && update.Message.Text[:8+len(BotName)] == "/statsm@"+BotName) {
+				if update.Message.From.Id == adminId {
+					args := strings.Split(update.Message.Text, " ")
+					startDate := "2024-11-17"
+					endDate := formatDate(time.Now())
+					if len(args) > 2 {
+						endDate = args[2]
+					}
+					if len(args) > 1 {
+						startDate = args[1]
+					}
+					message := getStatsMessage(update.Message.Chat.Id, startDate, endDate, "month")
+					go sendMessage(message)
+					return
+				}
 			}
 			if update.Message.Text == "/start" || update.Message.Text == "/start@"+BotName {
 				dayStats.Commands.Start++
@@ -388,6 +455,7 @@ func main() {
 					message := SendMessage{
 						ChatId: update.Message.Chat.Id,
 						Text:   "Расписание успешно добавлено",
+						ReplyMarkup: nextRandomReplyMarkup,
 					}
 					go sendMessage(message)
 					return
@@ -458,7 +526,7 @@ func main() {
 						ChatId:    update.Message.Chat.Id,
 						Text:      text,
 						ParseMode: "MarkdownV2",
-						ReplyMarkup: ReplyKeyboardRemove,
+						ReplyMarkup: nextRandomReplyMarkup,
 					}
 					go sendMessage(message)
 					return
@@ -475,10 +543,25 @@ func main() {
 					ChatId:      update.Message.Chat.Id,
 					Text:        text,
 					ParseMode:   "MarkdownV2",
-					ReplyMarkup: ReplyKeyboardRemove,
+					ReplyMarkup: nextRandomReplyMarkup,
 				}
 				go sendMessage(message)
 				return
+			} else if chatData.MessageStatus == MessageStatusBroadcast {
+				if update.Message.From.Id == adminId {
+					if update.Message.Text != "" {
+						chatData.MessageStatus = MessageStatusDefault
+						saveChatsDataToFile()
+						broadcastMessageToAll(update.Message.Text, update.Message.Entities)
+						message := SendMessage{
+							ChatId: adminId,
+							Text: "Сообщение разослано",
+							ReplyMarkup: nextRandomReplyMarkup,
+						}
+						go sendMessage(message)
+						return
+					}
+				}
 			}
 			return
 		}

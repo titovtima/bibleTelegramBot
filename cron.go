@@ -412,7 +412,7 @@ func getTimezoneByLocation(location Location) (string, error) {
 	return respData.Timezone, nil
 }
 
-var chooseTimezoneKeyboard = ReplyKeyboardMarkup{[][]KeyboardButton{{{ "Отправить геопозицию", true }}, 
+var chooseTimezoneKeyboard = ReplyKeyboardMarkup{[][]KeyboardButton{{{ "Определить время по геопозиции", true }}, 
 	{{"UTC+0", false}, {"UTC+1", false}, {"UTC+2", false}, {"UTC+3", false}},
 	{{"UTC+4", false}, {"UTC+5", false}, {"UTC+6", false}, {"UTC+7", false}},
 	{{"UTC+8", false}, {"UTC+9", false}, {"UTC+10", false}, {"UTC+11", false}},
