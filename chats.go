@@ -269,6 +269,7 @@ func normalizeDateString(s string) string {
 func getStatsMessage(chatId int64, startDate string, endDate string, groupBy string) SendMessage {
 	var dailyStats DayStatsArray
 	for day, stats := range statsFile {
+		day = normalizeDateString(day)
 		if day >= startDate && day <= endDate {
 			dailyStats = append(dailyStats, DayStats{stats, normalizeDateString(day)})
 		}

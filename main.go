@@ -311,8 +311,8 @@ func main() {
 					(len(update.Message.Text) > 6 + len(BotName) && update.Message.Text[:7+len(BotName)] == "/stats@"+BotName) {
 				if update.Message.From.Id == adminId {
 					args := strings.Split(update.Message.Text, " ")
-					startDate := "2024-11-17"
-					endDate := formatDate(time.Now())
+					startDate := time.Now().Add(-7 * 24 * time.Hour).Format(time.DateOnly)
+					endDate := time.Now().Format(time.DateOnly)
 					if len(args) > 2 {
 						endDate = args[2]
 					}
