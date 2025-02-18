@@ -52,7 +52,7 @@ func main() {
 	readTimezonesDiffsFile()
 	readStatsFile()
 	createRandomTimeJobsAfterRestart()
-	scheduler.NewJob(gocron.CronJob("0 3 * * *", false), gocron.NewTask(func ()  {
+	scheduler.NewJob(gocron.CronJob("0 1 * * *", false), gocron.NewTask(func ()  {
 		setDailyRandomTimeTasks()
 	}))
 
@@ -60,21 +60,20 @@ func main() {
 		body, err := io.ReadAll(request.Body)
 		if err != nil {
 			http.Error(writer, "Error reading body", 400)
-			println(err)
+			println(err.Error())
 			return
 		}
 		var update Update
 		err = json.Unmarshal(body, &update)
 		if err != nil {
 			http.Error(writer, "Error parsing body", 400)
-			println(err)
+			println(err.Error())
 			return
 		}
 		if update.CallbackQuery != nil {
 			chatData := getChatData(update.CallbackQuery.Message.Chat.Id)
 			if chatData == nil {
 				http.Error(writer, "Error getting user data", 400)
-				println(err)
 				return
 			}
 			writer.WriteHeader(200)
@@ -165,7 +164,6 @@ func main() {
 			chatData := getChatData(update.Message.Chat.Id)
 			if chatData == nil {
 				http.Error(writer, "Error getting user data", 400)
-				println(err)
 				return
 			}
 			writer.WriteHeader(200)
