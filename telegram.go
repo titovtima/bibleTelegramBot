@@ -164,18 +164,18 @@ func sendMessage(m SendMessage) {
 	client := http.Client{}
 	b, err := json.Marshal(m)
 	if err != nil {
-		println(err)
+		println(err.Error())
 		return
 	}
 	req, err := http.NewRequest("POST", TelegramApiUrl+"/sendMessage", bytes.NewReader(b))
 	if err != nil {
-		println(err)
+		println(err.Error())
 		return
 	}
 	req.Header.Add("Content-Type", "application/json")
 	_, err = client.Do(req)
 	if err != nil {
-		println(err)
+		println(err.Error())
 		return
 	}
 	dayStats := getCurrentDayStats()
