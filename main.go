@@ -51,7 +51,9 @@ func main() {
 	readChatsDataFromFile()
 	readTimezonesDiffsFile()
 	readStatsFile()
+	clearOldNextSends()
 	createRandomTimeJobsAfterRestart()
+	setDailyRandomTimeTasks()
 	scheduler.NewJob(gocron.CronJob("0 1 * * *", false), gocron.NewTask(func ()  {
 		setDailyRandomTimeTasks()
 	}))

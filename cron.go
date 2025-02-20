@@ -269,6 +269,14 @@ func randomVerseTask(chatId int64) {
 	go sendMessage(message)
 }
 
+func randomTimeTask(chatId int64, randomTime *RandomTimeVerse, date string) {
+	now := time.Now()
+	randomVerseTask(chatId)
+	randomTime.NextSends = filter(randomTime.NextSends, func(t time.Time) bool { return t.After(now) })
+	delete(chatsRandomTimeJobsIds[chatId][randomTime.Id], date)
+	saveChatsDataToFile()
+}
+
 func addRandomTimeForDay(day time.Time, randomTime *RandomTimeVerse, chatData *ChatData) {
 	loc, err := time.LoadLocation(chatData.Timezone)
 	if err != nil {
@@ -286,9 +294,7 @@ func addRandomTimeForDay(day time.Time, randomTime *RandomTimeVerse, chatData *C
 	randomTime.NextSends = append(randomTime.NextSends, newTime)
 	job, err := scheduler.NewJob(gocron.OneTimeJob(gocron.OneTimeJobStartDateTime(newTime)),
 		gocron.NewTask(func () {
-			randomVerseTask(chatData.ChatId)
-			randomTime.NextSends = filter(randomTime.NextSends, func(t time.Time) bool { return t.Sub(newTime) == 0; })
-			delete(chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id], dayStartTime.Format(time.DateOnly))
+			randomTimeTask(chatData.ChatId, randomTime, dayStartTime.Format(time.DateOnly))
 		}))
 	if err != nil {
 		println(err.Error())
@@ -312,20 +318,19 @@ func setDailyRandomTimeTasks() {
 }
 
 func createRandomTimeJobsAfterRestart() {
-	for _, chatData := range chatsData {
-		for _, randomTime := range chatData.RandomTime {
-			chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id] = make(map[string]uuid.UUID)
-			for _, send := range randomTime.NextSends {
+	for i := range chatsData {
+		for j := range chatsData[i].RandomTime {
+			chatsRandomTimeJobsIds[chatsData[i].ChatId][chatsData[i].RandomTime[j].Id] = make(map[string]uuid.UUID)
+			for _, send := range chatsData[i].RandomTime[j].NextSends {
 				job, err := scheduler.NewJob(gocron.OneTimeJob(gocron.OneTimeJobStartDateTime(send)),
 					gocron.NewTask(func () {
-						randomVerseTask(chatData.ChatId)
-						randomTime.NextSends = filter(randomTime.NextSends, func(t time.Time) bool { return t.Sub(send) == 0; })
-						delete(chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id], send.Format(time.DateOnly))
+						randomTimeTask(chatsData[i].ChatId, &chatsData[i].RandomTime[j], send.Format(time.DateOnly))
 					}))
 				if err != nil {
 					println("error creating random time job", err.Error())
+				} else {
+					chatsRandomTimeJobsIds[chatsData[i].ChatId][chatsData[i].RandomTime[j].Id][send.Format(time.DateOnly)] = job.ID()
 				}
-				chatsRandomTimeJobsIds[chatData.ChatId][randomTime.Id][send.Format(time.DateOnly)] = job.ID()
 			}
 		}
 	}

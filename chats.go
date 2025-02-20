@@ -86,6 +86,16 @@ func readChatsDataFromFile() {
 	}
 }
 
+func clearOldNextSends() {
+	now := time.Now()
+	for i := range chatsData {
+		for j := range chatsData[i].RandomTime {
+			chatsData[i].RandomTime[j].NextSends = filter(chatsData[i].RandomTime[j].NextSends, 
+				func(t time.Time) bool { return t.After(now) })
+		}
+	}
+}
+
 func saveChatsDataToFile() error {
 	fo, err := os.Create(chatsDataFileName)
 	if err != nil {
