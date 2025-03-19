@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
-	"slices"
 	"strings"
+	"time"
 )
 
 var TelegramApiToken string = os.Getenv("TELEGRAM_API_TOKEN")
@@ -23,6 +23,21 @@ const (
 	ChatTypeSupergroup TelegramChatType = "supergroup"
 	ChatTypeChannel    TelegramChatType = "channel"
 )
+
+func chatTypeToInt(chatType TelegramChatType) int {
+	switch chatType {
+	case ChatTypePrivate:
+		return 0
+	case ChatTypeGroup:
+		return 1
+	case ChatTypeSupergroup:
+		return 2
+	case ChatTypeChannel:
+		return 3
+	default:
+		return -1
+	}
+}
 
 type TelegramChat struct {
 	Id       int64
@@ -178,12 +193,9 @@ func sendMessage(m SendMessage) {
 		println(err.Error())
 		return
 	}
-	dayStats := getCurrentDayStats()
-	dayStats.MessagesSent++
-	if slices.Index(dayStats.ChatsSent, m.ChatId) == -1 {
-		dayStats.ChatsSent = append(dayStats.ChatsSent, m.ChatId)
-	}
-	saveStatsFile()
+	statsDay := time.Now().In(statsLocation).Format(time.DateOnly)
+	dbStatPlusOne(statsDay, "msg_sent")
+	dbStatUpdateChatsList(statsDay, "chats_sent", m.ChatId)
 }
 
 func escapingSymbols(str string) string {
