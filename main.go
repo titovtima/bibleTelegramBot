@@ -144,7 +144,7 @@ func main() {
 					ChatId:      chatId,
 					Text:        "Расписание `" + strings.Trim(update.CallbackQuery.Data[11:], " ") + "` удалено",
 					ParseMode:   "MarkdownV2",
-					ReplyMarkup: ReplyKeyboardRemove,
+					ReplyMarkup: nextRandomReplyMarkup,
 				}
 				go sendMessage(message)
 			} else if len(update.CallbackQuery.Data) > 17 && update.CallbackQuery.Data[:17] == "removerandomtime:" {
@@ -161,7 +161,7 @@ func main() {
 				message := SendMessage{
 					ChatId:      chatId,
 					Text:        "Расписание случайного времени отправки удалено",
-					ReplyMarkup: ReplyKeyboardRemove,
+					ReplyMarkup: nextRandomReplyMarkup,
 				}
 				go sendMessage(message)
 			}
@@ -186,7 +186,7 @@ func main() {
 					message := SendMessage{
 						ChatId:      chatId,
 						Text:        "Операция отменена",
-						ReplyMarkup: ReplyKeyboardRemove,
+						ReplyMarkup: nextRandomReplyMarkup,
 					}
 					go sendMessage(message)
 				}
@@ -378,7 +378,7 @@ func main() {
 					message := SendMessage{
 						ChatId:      chatId,
 						Text:        "Отправьте сообщение для общей рассылки",
-						ReplyMarkup: ReplyKeyboardRemove,
+						ReplyMarkup: nextRandomReplyMarkup,
 					}
 					go sendMessage(message)
 					return
@@ -405,7 +405,7 @@ func main() {
 						ChatId:      chatId,
 						Text:        text,
 						ParseMode:   "MarkdownV2",
-						ReplyMarkup: ReplyKeyboardRemove,
+						ReplyMarkup: nextRandomReplyMarkup,
 					})
 					return
 				}
@@ -431,7 +431,7 @@ func main() {
 						ChatId:      chatId,
 						Text:        text,
 						ParseMode:   "MarkdownV2",
-						ReplyMarkup: ReplyKeyboardRemove,
+						ReplyMarkup: nextRandomReplyMarkup,
 					})
 					return
 				}
@@ -457,7 +457,7 @@ func main() {
 						ChatId:      chatId,
 						Text:        text,
 						ParseMode:   "MarkdownV2",
-						ReplyMarkup: ReplyKeyboardRemove,
+						ReplyMarkup: nextRandomReplyMarkup,
 					})
 					return
 				}
@@ -518,7 +518,7 @@ func main() {
 							go sendMessage(SendMessage{
 								ChatId:      chatId,
 								Text:        "Такое расписание уже установлено",
-								ReplyMarkup: ReplyKeyboardRemove,
+								ReplyMarkup: nextRandomReplyMarkup,
 							})
 							return
 						} else {
@@ -530,7 +530,7 @@ func main() {
 					message := SendMessage{
 						ChatId:      chatId,
 						Text:        "Расписание успешно добавлено",
-						ReplyMarkup: ReplyKeyboardRemove,
+						ReplyMarkup: nextRandomReplyMarkup,
 					}
 					go sendMessage(message)
 					return
@@ -603,7 +603,7 @@ func main() {
 						ChatId:      chatId,
 						Text:        text,
 						ParseMode:   "MarkdownV2",
-						ReplyMarkup: ReplyKeyboardRemove,
+						ReplyMarkup: nextRandomReplyMarkup,
 					}
 					go sendMessage(message)
 					return
@@ -620,7 +620,7 @@ func main() {
 					ChatId:      chatId,
 					Text:        text,
 					ParseMode:   "MarkdownV2",
-					ReplyMarkup: ReplyKeyboardRemove,
+					ReplyMarkup: nextRandomReplyMarkup,
 				}
 				go sendMessage(message)
 				return
@@ -632,7 +632,7 @@ func main() {
 						message := SendMessage{
 							ChatId:      adminId,
 							Text:        "Сообщение разослано",
-							ReplyMarkup: ReplyKeyboardRemove,
+							ReplyMarkup: nextRandomReplyMarkup,
 						}
 						go sendMessage(message)
 						return

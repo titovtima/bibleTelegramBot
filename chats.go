@@ -38,6 +38,7 @@ type RandomTimeVerse struct {
 }
 
 const randomVerseTextMessage = "Следующий случайный стих"
+var nextRandomReplyMarkup = ReplyKeyboardMarkup{[][]KeyboardButton{{{randomVerseTextMessage, false}}}}
 
 type Stats struct {
 	Date  string
