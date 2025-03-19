@@ -85,9 +85,11 @@ func main() {
 				dbUpdateMessageStatus(chatId, MessageStatusAddCronCron)
 				message := SendMessage{
 					ChatId: chatId,
-					Text: "Введите строку в формате cron\\. Можно разделить несколько расписаний с помощью точки с запятой\\. " +
-						"Например: `0 9 * * 6,7; 0 6-22/2 * * 1-5`",
+					Text: "Введите строку в формате [cron](https://ru.wikipedia.org/wiki/Cron) \\(воскресенье \\- 0\\)\\. " +
+						"Можно разделить несколько расписаний с помощью точки с запятой\\. " +
+						"Например: `0 9 * * 6,0; 0 6-22/2 * * 1-5`\n",
 					ParseMode: "MarkdownV2",
+					LinkPreviewOptions: LinkPreviewOptions{true},
 				}
 				go sendMessage(message)
 			} else if update.CallbackQuery.Data == "addcron 1" {
