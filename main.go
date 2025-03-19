@@ -2,12 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -48,14 +48,20 @@ func main() {
 	scheduler.Start()
 	defer func() { scheduler.Shutdown() }()
 
-	readChatsDataFromFile()
+	err = connectToDb()
+	if err != nil { panic(err) }
 	readTimezonesDiffsFile()
-	readStatsFile()
-	clearOldNextSends()
-	createRandomTimeJobsAfterRestart()
-	setDailyRandomTimeTasks()
-	scheduler.NewJob(gocron.CronJob("0 1 * * *", false), gocron.NewTask(func ()  {
+	err = setCronJobs()
+	if err != nil { panic(err) }
+	err = dbClearOldSends()
+	if err != nil { panic(err) }
+	err = createRandomTimeJobsAfterRestart()
+	if err != nil { panic(err) }
+	err = setDailyRandomTimeTasks()
+	if err != nil { panic(err) }
+	scheduler.NewJob(gocron.CronJob("0 1 * * *", false), gocron.NewTask(func() {
 		setDailyRandomTimeTasks()
+		dbClearOldSends()
 	}))
 
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
@@ -73,75 +79,69 @@ func main() {
 			return
 		}
 		if update.CallbackQuery != nil {
-			chatData := getChatData(update.CallbackQuery.Message.Chat.Id)
-			if chatData == nil {
-				http.Error(writer, "Error getting user data", 400)
-				return
-			}
+			chatId := update.CallbackQuery.Message.Chat.Id
 			writer.WriteHeader(200)
 			if update.CallbackQuery.Data == "addcron cron" {
-				chatData.MessageStatus = MessageStatusAddCronCron
-				saveChatsDataToFile()
+				dbUpdateMessageStatus(chatId, MessageStatusAddCronCron)
 				message := SendMessage{
-					ChatId: update.CallbackQuery.Message.Chat.Id,
+					ChatId: chatId,
 					Text: "Введите строку в формате cron\\. Можно разделить несколько расписаний с помощью точки с запятой\\. " +
 						"Например: `0 9 * * 6,7; 0 6-22/2 * * 1-5`",
 					ParseMode: "MarkdownV2",
 				}
 				go sendMessage(message)
 			} else if update.CallbackQuery.Data == "addcron 1" {
-				chatData.MessageStatus = MessageStatusAddCron1
-				saveChatsDataToFile()
+				dbUpdateMessageStatus(chatId, MessageStatusAddCron1)
 				message := SendMessage{
-					ChatId:    update.CallbackQuery.Message.Chat.Id,
+					ChatId:    chatId,
 					Text:      "Введите время в формате `чч:мм`\\. Например: `18:03`, или `07:40`",
 					ParseMode: "MarkdownV2",
 				}
 				go sendMessage(message)
 			} else if update.CallbackQuery.Data == "addcron 2" {
-				chatData.MessageStatus = MessageStatusAddCron2
-				saveChatsDataToFile()
+				dbUpdateMessageStatus(chatId, MessageStatusAddCron2)
 				message := SendMessage{
-					ChatId: update.CallbackQuery.Message.Chat.Id,
+					ChatId: chatId,
 					Text: "Введите время в формате `чч:мм`\\. Можно разделить несколько расписаний с помощью запятой\\. " +
 						"Например: `18:03, 07:40`, или `01:00, 10:20, 23:59`",
 					ParseMode: "MarkdownV2",
 				}
 				go sendMessage(message)
 			} else if update.CallbackQuery.Data == "addcron 3" {
-				chatData.MessageStatus = MessageStatusAddCron3
-				saveChatsDataToFile()
+				dbUpdateMessageStatus(chatId, MessageStatusAddCron3)
 				message := SendMessage{
-					ChatId: update.CallbackQuery.Message.Chat.Id,
+					ChatId: chatId,
 					Text: "Введите номер дня недели и время в формате `д чч:мм`\\. Например: `1 18:03`, или `7 07:40`\\. " +
 						"\\(1 \\- понедельник, 7 \\- воскресенье\\)",
 					ParseMode: "MarkdownV2",
 				}
 				go sendMessage(message)
 			} else if update.CallbackQuery.Data == "addcron 4" {
-				chatData.MessageStatus = MessageStatusAddCron4
-				saveChatsDataToFile()
+				dbUpdateMessageStatus(chatId, MessageStatusAddCron4)
 				message := SendMessage{
-					ChatId: update.CallbackQuery.Message.Chat.Id,
+					ChatId: chatId,
 					Text: "Введите номер дня недели и время в формате `д чч:мм`\\. Можно разделить несколько расписаний с помощью запятой\\. " +
 						"Например: `1 18:03, 7 07:40`\\. \\(1 \\- понедельник, 7 \\- воскресенье\\)",
 					ParseMode: "MarkdownV2",
 				}
 				go sendMessage(message)
 			} else if update.CallbackQuery.Data == "addcron 5" {
-				chatData.MessageStatus = MessageStatusAddCron5
-				saveChatsDataToFile()
+				dbUpdateMessageStatus(chatId, MessageStatusAddCron5)
 				message := SendMessage{
-					ChatId: update.CallbackQuery.Message.Chat.Id,
+					ChatId: chatId,
 					Text: "Введите время начала и конца промежутка для отправки в случайное время " +
 						"в формате `чч:мм, чч:мм`\\. Например: `07:40, 18:03`\\.",
 					ParseMode: "MarkdownV2",
 				}
 				go sendMessage(message)
 			} else if len(update.CallbackQuery.Data) > 11 && update.CallbackQuery.Data[:11] == "removecron:" {
-				removeCronForChat(update.CallbackQuery.Message.Chat.Id, update.CallbackQuery.Data[11:])
+				err := removeCronForChat(chatId, update.CallbackQuery.Data[11:])
+				if err != nil {
+					sendErrorMessage(chatId)
+					return
+				}
 				message := SendMessage{
-					ChatId:      update.CallbackQuery.Message.Chat.Id,
+					ChatId:      chatId,
 					Text:        "Расписание `" + strings.Trim(update.CallbackQuery.Data[11:], " ") + "` удалено",
 					ParseMode:   "MarkdownV2",
 					ReplyMarkup: ReplyKeyboardRemove,
@@ -149,13 +149,17 @@ func main() {
 				go sendMessage(message)
 			} else if len(update.CallbackQuery.Data) > 17 && update.CallbackQuery.Data[:17] == "removerandomtime:" {
 				id, err := strconv.Atoi(update.CallbackQuery.Data[17:])
-				if err != nil { 
+				if err != nil {
 					println(err.Error())
-					return 
+					return
 				}
-				removeRandomTimeRegular(update.CallbackQuery.Message.Chat.Id, id)
+				err = removeRandomTimeRegular(update.CallbackQuery.Message.Chat.Id, id)
+				if err != nil {
+					sendErrorMessage(chatId)
+					return
+				}
 				message := SendMessage{
-					ChatId:      update.CallbackQuery.Message.Chat.Id,
+					ChatId:      chatId,
 					Text:        "Расписание случайного времени отправки удалено",
 					ReplyMarkup: ReplyKeyboardRemove,
 				}
@@ -163,25 +167,24 @@ func main() {
 			}
 			return
 		} else if update.Message != nil {
-			chatData := getChatData(update.Message.Chat.Id)
-			if chatData == nil {
-				http.Error(writer, "Error getting user data", 400)
+			chatId := update.Message.Chat.Id
+			err := dbAddChat(chatId, update.Message.Chat.ChatType)
+			if err != nil {
+				sendErrorMessage(chatId)
 				return
 			}
 			writer.WriteHeader(200)
 
-			dayStats := getCurrentDayStats()
-			dayStats.MessagesReceived++
-			if slices.Index(dayStats.ChatsReceived, chatData.ChatId) == -1 {
-				dayStats.ChatsReceived = append(dayStats.ChatsReceived, chatData.ChatId)
-			}
+			statsDay := time.Now().In(statsLocation).Format(time.DateOnly)
+			dbStatPlusOne(statsDay, "msg_received")
+			dbStatUpdateChatsList(statsDay, "chats_received", chatId)
 
 			if update.Message.Text == "/cancel" || update.Message.Text == "/cancel@"+BotName {
-				if chatData.MessageStatus != MessageStatusDefault {
-					chatData.MessageStatus = MessageStatusDefault
-					saveChatsDataToFile()
+				messageStatus, _ := dbGetMessageStatus(chatId)
+				if messageStatus != MessageStatusDefault {
+					dbUpdateMessageStatus(chatId, MessageStatusDefault)
 					message := SendMessage{
-						ChatId:      update.Message.Chat.Id,
+						ChatId:      chatId,
 						Text:        "Операция отменена",
 						ReplyMarkup: ReplyKeyboardRemove,
 					}
@@ -190,9 +193,9 @@ func main() {
 				return
 			}
 			if update.Message.Text == "/addregular" || update.Message.Text == "/addregular@"+BotName {
-				dayStats.Commands.AddRegular++
+				dbStatPlusOne(statsDay, "cmd_addregular")
 				message := SendMessage{
-					ChatId: update.Message.Chat.Id,
+					ChatId: chatId,
 					Text:   "Выберите периодичность",
 					ReplyMarkup: InlineKeyboardMarkup{[][]InlineKeyboardButton{
 						{{"Раз в день", "addcron 1"}, {"Несколько раз в день", "addcron 2"}},
@@ -205,28 +208,46 @@ func main() {
 				return
 			}
 			if update.Message.Text == "/getregular" || update.Message.Text == "/getregular@"+BotName {
-				dayStats.Commands.GetRegular++
-				crons := chatData.VersesCrons
+				dbStatPlusOne(statsDay, "cmd_getregular")
+				crons, err := dbGetAllCrons(chatId)
+				if err != nil {
+					sendErrorMessage(chatId)
+					return
+				}
+				randomTimes, err := dbGetAllRandomTimes(chatId)
+				if err != nil {
+					sendErrorMessage(chatId)
+					return
+				}
 				text := "Текущие расписания:"
 				for _, cron := range crons {
 					text += "\n" + cronToString(cron)
 				}
-				for _, rt := range chatData.RandomTime {
+				for _, rt := range randomTimes {
 					text += "\n" + randomTimeToString(rt)
 				}
-				if len(crons) + len(chatData.RandomTime) == 0 {
+				if len(crons)+len(randomTimes) == 0 {
 					text = "Нет регулярных расписаний"
 				}
 				message := SendMessage{
-					ChatId: update.Message.Chat.Id,
+					ChatId: chatId,
 					Text:   text,
 				}
 				go sendMessage(message)
 				return
 			}
 			if update.Message.Text == "/getregularcron" || update.Message.Text == "/getregularcron@"+BotName {
-				dayStats.Commands.GetRegularCron++
-				crons := chatData.VersesCrons
+				dbStatPlusOne(statsDay, "cmd_getregularcron")
+				crons, err := dbGetAllCrons(chatId)
+				if err != nil {
+					sendErrorMessage(chatId)
+					return
+				}
+				randomTimes, err := dbGetAllRandomTimes(chatId)
+				if err != nil {
+					sendErrorMessage(chatId)
+					return
+				}
 				text := "Текущие расписания:\n`"
 				for i, cron := range crons {
 					if i > 0 {
@@ -235,14 +256,14 @@ func main() {
 					text += cron
 				}
 				text += "`"
-				for _, rt := range chatData.RandomTime {
+				for _, rt := range randomTimes {
 					text += "\n" + randomTimeToString(rt)
 				}
-				if len(crons) + len(chatData.RandomTime) == 0 {
+				if len(crons)+len(randomTimes) == 0 {
 					text = "Нет регулярных расписаний"
 				}
 				message := SendMessage{
-					ChatId:    update.Message.Chat.Id,
+					ChatId:    chatId,
 					Text:      text,
 					ParseMode: "MarkdownV2",
 				}
@@ -250,12 +271,20 @@ func main() {
 				return
 			}
 			if update.Message.Text == "/removeregular" || update.Message.Text == "/removeregular@"+BotName {
-				dayStats.Commands.RemoveRegular++
-				crons := chatData.VersesCrons
-				randomTimes := chatData.RandomTime
-				if len(crons) + len(randomTimes) == 0 {
+				dbStatPlusOne(statsDay, "cmd_removeregular")
+				crons, err := dbGetAllCrons(chatId)
+				if err != nil {
+					sendErrorMessage(chatId)
+					return
+				}
+				randomTimes, err := dbGetAllRandomTimes(chatId)
+				if err != nil {
+					sendErrorMessage(chatId)
+					return
+				}
+				if len(crons)+len(randomTimes) == 0 {
 					message := SendMessage{
-						ChatId: update.Message.Chat.Id,
+						ChatId: chatId,
 						Text:   "Нет регулярных расписаний",
 					}
 					go sendMessage(message)
@@ -266,12 +295,12 @@ func main() {
 					replyMarkup.InlineKeyboard = append(replyMarkup.InlineKeyboard,
 						[]InlineKeyboardButton{{cronToString(cron), "removecron:" + cron}})
 				}
-				for _, randomTime := range chatData.RandomTime {
+				for _, randomTime := range randomTimes {
 					replyMarkup.InlineKeyboard = append(replyMarkup.InlineKeyboard,
 						[]InlineKeyboardButton{{randomTimeToShortString(randomTime), "removerandomtime:" + strconv.Itoa(randomTime.Id)}})
 				}
 				message := SendMessage{
-					ChatId:      update.Message.Chat.Id,
+					ChatId:      chatId,
 					Text:        "Выберите расписание для удаления",
 					ReplyMarkup: replyMarkup,
 				}
@@ -279,10 +308,11 @@ func main() {
 				return
 			}
 			if update.Message.Text == "/clearregular" || update.Message.Text == "/clearregular@"+BotName {
-				dayStats.Commands.ClearRegular++
-				clearCronsForChat(update.Message.Chat.Id, false)
+				dbStatPlusOne(statsDay, "cmd_clearregular")
+				clearCronsForChat(chatId, false)
+				clearRandomTimesForChat(chatId)
 				message := SendMessage{
-					ChatId:    update.Message.Chat.Id,
+					ChatId:    chatId,
 					Text:      "Расписания очищены",
 					ParseMode: "MarkdownV2",
 				}
@@ -290,38 +320,37 @@ func main() {
 				return
 			}
 			if update.Message.Text == "/random" || update.Message.Text == "/random@"+BotName ||
-					update.Message.Text == "/verse" || update.Message.Text == "/verse@"+BotName ||
-					update.Message.Text == randomVerseTextMessage {
-				dayStats.Commands.Random++
+				update.Message.Text == "/verse" || update.Message.Text == "/verse@"+BotName ||
+				update.Message.Text == randomVerseTextMessage {
+				dbStatPlusOne(statsDay, "cmd_random")
 				message := SendMessage{
-					ChatId: update.Message.Chat.Id,
+					ChatId: chatId,
 					Text:   bible.getRandomVerse(),
 				}
 				go sendMessage(message)
 				return
 			}
 			if update.Message.Text == "/settimezone" || update.Message.Text == "/settimezone@"+BotName {
-				dayStats.Commands.SetTimezone++
-				chatData.MessageStatus = MessageStatusSetTimezone
-				saveChatsDataToFile()
+				dbStatPlusOne(statsDay, "cmd_settimezone")
+				dbUpdateMessageStatus(chatId, MessageStatusSetTimezone)
 				if update.Message.Chat.ChatType == ChatTypePrivate {
 					message := SendMessage{
-						ChatId: update.Message.Chat.Id,
+						ChatId: chatId,
 						Text: "Отправьте геопозицию, введите [название](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) часового пояса " +
 							"\\(Например: `Europe/Moscow`\\), или выберите разницу с UTC \\(Например: `UTC+1`\\)",
-						ParseMode:   "MarkdownV2",
-						ReplyMarkup: chooseTimezoneKeyboard,
+						ParseMode:          "MarkdownV2",
+						ReplyMarkup:        chooseTimezoneKeyboard,
 						LinkPreviewOptions: LinkPreviewOptions{true},
 					}
 					go sendMessage(message)
 					return
 				} else {
 					message := SendMessage{
-						ChatId: update.Message.Chat.Id,
+						ChatId: chatId,
 						Text: "Введите [название](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) часового пояса " +
 							"\\(Например: `Europe/Moscow`\\), или выберите разницу с UTC \\(Например: `UTC+1`\\)",
-						ParseMode: "MarkdownV2",
-						ReplyMarkup: chooseTimezoneKeyboardNoLocation,
+						ParseMode:          "MarkdownV2",
+						ReplyMarkup:        chooseTimezoneKeyboardNoLocation,
 						LinkPreviewOptions: LinkPreviewOptions{true},
 					}
 					go sendMessage(message)
@@ -329,10 +358,15 @@ func main() {
 				}
 			}
 			if update.Message.Text == "/gettimezone" || update.Message.Text == "/gettimezone@"+BotName {
-				dayStats.Commands.GetTimezone++
+				dbStatPlusOne(statsDay, "cmd_gettimezone")
+				timezone, err := dbGetTimezone(chatId)
+				if err != nil {
+					sendErrorMessage(chatId)
+					return
+				}
 				message := SendMessage{
-					ChatId:    update.Message.Chat.Id,
-					Text:      fmt.Sprintf("Текущий часовой пояс: `%s`", displayTimezone(chatData.Timezone)),
+					ChatId:    chatId,
+					Text:      fmt.Sprintf("Текущий часовой пояс: `%s`", displayTimezone(timezone)),
 					ParseMode: "MarkdownV2",
 				}
 				go sendMessage(message)
@@ -340,11 +374,10 @@ func main() {
 			}
 			if update.Message.Text == "/broadcast" || update.Message.Text == "/broadcast@"+BotName {
 				if update.Message.From.Id == adminId {
-					chatData.MessageStatus = MessageStatusBroadcast
-					saveChatsDataToFile()
+					dbUpdateMessageStatus(chatId, MessageStatusBroadcast)
 					message := SendMessage{
-						ChatId:    update.Message.Chat.Id,
-						Text:      "Отправьте сообщение для общей рассылки",
+						ChatId:      chatId,
+						Text:        "Отправьте сообщение для общей рассылки",
 						ReplyMarkup: ReplyKeyboardRemove,
 					}
 					go sendMessage(message)
@@ -352,138 +385,179 @@ func main() {
 				}
 			}
 			if (len(update.Message.Text) > 6 && update.Message.Text[:7] == "/stats ") || (update.Message.Text == "/stats") ||
-					(len(update.Message.Text) > 6 + len(BotName) && update.Message.Text[:7+len(BotName)] == "/stats@"+BotName) {
-				if update.Message.From.Id == adminId {
+				(len(update.Message.Text) > 6+len(BotName) && update.Message.Text[:7+len(BotName)] == "/stats@"+BotName) {
+				if update.Message.From.Id == adminId || update.Message.From.Id == developerId {
 					args := strings.Split(update.Message.Text, " ")
-					startDate := "2024-11-17"
-					endDate := formatDate(time.Now())
+					startDate := time.Now().In(statsLocation).Add(-7 * 24 * time.Hour).Format(time.DateOnly)
+					endDate := time.Now().In(statsLocation).Format(time.DateOnly)
 					if len(args) > 2 {
 						endDate = args[2]
 					}
 					if len(args) > 1 {
 						startDate = args[1]
 					}
-					message := getStatsMessage(update.Message.Chat.Id, startDate, endDate, "none")
-					go sendMessage(message)
+					text, err := getStatsMessageText(startDate, endDate, "none")
+					if err != nil {
+						sendErrorMessage(chatId)
+						return
+					}
+					go sendMessage(SendMessage{
+						ChatId:      chatId,
+						Text:        text,
+						ParseMode:   "MarkdownV2",
+						ReplyMarkup: ReplyKeyboardRemove,
+					})
 					return
 				}
 			}
 			if (len(update.Message.Text) > 6 && update.Message.Text[:7] == "/statsw") ||
-					(len(update.Message.Text) > 7 + len(BotName) && update.Message.Text[:8+len(BotName)] == "/statsw@"+BotName) {
-				if update.Message.From.Id == adminId {
+				(len(update.Message.Text) > 7+len(BotName) && update.Message.Text[:8+len(BotName)] == "/statsw@"+BotName) {
+				if update.Message.From.Id == adminId || update.Message.From.Id == developerId {
 					args := strings.Split(update.Message.Text, " ")
-					startDate := "2024-11-17"
-					endDate := formatDate(time.Now())
+					startDate := time.Now().In(statsLocation).Add(-26 * 7 * 24 * time.Hour).Format(time.DateOnly)
+					endDate := time.Now().In(statsLocation).Format(time.DateOnly)
 					if len(args) > 2 {
 						endDate = args[2]
 					}
 					if len(args) > 1 {
 						startDate = args[1]
 					}
-					message := getStatsMessage(update.Message.Chat.Id, startDate, endDate, "week")
-					go sendMessage(message)
+					text, err := getStatsMessageText(startDate, endDate, "week")
+					if err != nil {
+						sendErrorMessage(chatId)
+						return
+					}
+					go sendMessage(SendMessage{
+						ChatId:      chatId,
+						Text:        text,
+						ParseMode:   "MarkdownV2",
+						ReplyMarkup: ReplyKeyboardRemove,
+					})
 					return
 				}
 			}
 			if (len(update.Message.Text) > 6 && update.Message.Text[:7] == "/statsm") ||
-					(len(update.Message.Text) > 7 + len(BotName) && update.Message.Text[:8+len(BotName)] == "/statsm@"+BotName) {
-				if update.Message.From.Id == adminId {
+				(len(update.Message.Text) > 7+len(BotName) && update.Message.Text[:8+len(BotName)] == "/statsm@"+BotName) {
+				if update.Message.From.Id == adminId || update.Message.From.Id == developerId {
 					args := strings.Split(update.Message.Text, " ")
 					startDate := "2024-11-17"
-					endDate := formatDate(time.Now())
+					endDate := time.Now().In(statsLocation).Format(time.DateOnly)
 					if len(args) > 2 {
 						endDate = args[2]
 					}
 					if len(args) > 1 {
 						startDate = args[1]
 					}
-					message := getStatsMessage(update.Message.Chat.Id, startDate, endDate, "month")
-					go sendMessage(message)
+					text, err := getStatsMessageText(startDate, endDate, "month")
+					if err != nil {
+						sendErrorMessage(chatId)
+						return
+					}
+					go sendMessage(SendMessage{
+						ChatId:      chatId,
+						Text:        text,
+						ParseMode:   "MarkdownV2",
+						ReplyMarkup: ReplyKeyboardRemove,
+					})
 					return
 				}
 			}
 			if update.Message.Text == "/start" || update.Message.Text == "/start@"+BotName {
-				dayStats.Commands.Start++
-				message := getStartMessage(update.Message.Chat.Id)
+				dbStatPlusOne(statsDay, "cmd_start")
+				message := getStartMessage(chatId)
 				go sendMessage(message)
-				chatData.MessageStatus = MessageStatusSetTimezone
-				saveChatsDataToFile()
+				dbUpdateMessageStatus(chatId, MessageStatusSetTimezone)
 				return
 			}
-			if chatData.MessageStatus >= 1 && chatData.MessageStatus <= 5 {
+			messageStatus, err := dbGetMessageStatus(chatId)
+			if err != nil {
+				sendErrorMessage(chatId)
+			}
+			if messageStatus >= 1 && messageStatus <= 5 {
 				if update.Message.Text != "" {
 					var crons []string
 					var err error = nil
-					if chatData.MessageStatus == MessageStatusAddCronCron {
+					if messageStatus == MessageStatusAddCronCron {
 						for _, cron := range strings.Split(update.Message.Text, ";") {
 							trimmed := strings.Trim(cron, " ")
 							if checkValidCron(trimmed) {
 								crons = append(crons, trimmed)
 							} else {
 								message := SendMessage{
-									ChatId: update.Message.Chat.Id,
+									ChatId: chatId,
 									Text:   "Некорректный формат. Попробуйте ещё раз",
 								}
 								go sendMessage(message)
 								return
 							}
 						}
-					} else if chatData.MessageStatus == MessageStatusAddCron1 {
+					} else if messageStatus == MessageStatusAddCron1 {
 						var cron string
 						cron, err = parseTimeToCron(update.Message.Text)
 						crons = []string{cron}
-					} else if chatData.MessageStatus == MessageStatusAddCron2 {
+					} else if messageStatus == MessageStatusAddCron2 {
 						crons, err = parseListTimesToCron(update.Message.Text)
-					} else if chatData.MessageStatus == MessageStatusAddCron3 {
+					} else if messageStatus == MessageStatusAddCron3 {
 						var cron string
 						cron, err = parseWeekDayTimeToCron(update.Message.Text)
 						crons = []string{cron}
-					} else if chatData.MessageStatus == MessageStatusAddCron4 {
+					} else if messageStatus == MessageStatusAddCron4 {
 						crons, err = parseListWeekDayTimesToCron(update.Message.Text)
 					}
 					if err != nil {
 						message := SendMessage{
-							ChatId: update.Message.Chat.Id,
+							ChatId: chatId,
 							Text:   "Некорректный формат. Попробуйте ещё раз",
 						}
 						go sendMessage(message)
 						return
 					}
-					addCronsForChat(crons, update.Message.Chat.Id, false)
-					chatData.MessageStatus = MessageStatusDefault
-					saveChatsDataToFile()
+					err = addCronsForChat(crons, chatId, false)
+					if err != nil {
+						if errors.Is(err, errExistingCron) {
+							go sendMessage(SendMessage{
+								ChatId:      chatId,
+								Text:        "Такое расписание уже установлено",
+								ReplyMarkup: ReplyKeyboardRemove,
+							})
+							return
+						} else {
+							sendErrorMessage(chatId)
+							return
+						}
+					}
+					dbUpdateMessageStatus(chatId, MessageStatusDefault)
 					message := SendMessage{
-						ChatId: update.Message.Chat.Id,
-						Text:   "Расписание успешно добавлено",
+						ChatId:      chatId,
+						Text:        "Расписание успешно добавлено",
 						ReplyMarkup: ReplyKeyboardRemove,
 					}
 					go sendMessage(message)
 					return
 				}
 			}
-			if chatData.MessageStatus == MessageStatusAddCron5 {
+			if messageStatus == MessageStatusAddCron5 {
 				if update.Message.Text != "" {
 					times, err := parseListTimes(update.Message.Text)
 					if err != nil || len(times) != 2 {
 						message := SendMessage{
-							ChatId: update.Message.Chat.Id,
+							ChatId: chatId,
 							Text:   "Некорректный формат. Попробуйте ещё раз",
 						}
 						go sendMessage(message)
 						return
 					}
-					addRandomTimeRegular(chatData.ChatId, times[0], times[1])
-					chatData.MessageStatus = MessageStatusDefault
-					saveChatsDataToFile()
+					addRandomTimeRegular(chatId, times[0], times[1])
+					dbUpdateMessageStatus(chatId, MessageStatusDefault)
 					message := SendMessage{
-						ChatId: update.Message.Chat.Id,
+						ChatId: chatId,
 						Text:   "Расписание успешно добавлено",
 					}
 					go sendMessage(message)
 					return
 				}
 			}
-			if chatData.MessageStatus == MessageStatusSetTimezone {
+			if messageStatus == MessageStatusSetTimezone {
 				var timezone string
 				if update.Message.Location != nil {
 					var err1 error
@@ -491,11 +565,11 @@ func main() {
 					_, err2 := time.LoadLocation(timezone)
 					if err1 != nil || err2 != nil {
 						message := SendMessage{
-							ChatId: update.Message.Chat.Id,
+							ChatId: chatId,
 							Text: "Не удалось определить часовой пояс по местоположению\\. Можете попробовать ещё раз, или отправить " +
 								"[название](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) часового пояса " +
 								"\\(Например: `Europe/Moscow`\\)\\.",
-							ParseMode: "MarkdownV2",
+							ParseMode:          "MarkdownV2",
 							LinkPreviewOptions: LinkPreviewOptions{true},
 						}
 						go sendMessage(message)
@@ -506,7 +580,7 @@ func main() {
 					_, err := time.LoadLocation(timezone)
 					if err != nil {
 						message := SendMessage{
-							ChatId: update.Message.Chat.Id,
+							ChatId: chatId,
 							Text: "Не удалось определить часовой пояс\\. Можете попробовать ещё раз\\. Названия часовых поясов можно посмотреть " +
 								"[здесь](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)\\. " +
 								"Примеры: `Europe/Moscow`, `America/Los_Angeles`\\.",
@@ -516,46 +590,48 @@ func main() {
 						return
 					}
 				}
-				chatData.Timezone = timezone
-				chatData.MessageStatus = MessageStatusDefault
-				saveChatsDataToFile()
-				go recreateJobsForChat(chatData.ChatId)
+				dbUpdateChatData(chatId, MessageStatusDefault, timezone)
+				go recreateJobsForChat(chatId)
 				text := "Часовой пояс `" + displayTimezone(timezone) + "` успешно установлен\\. "
-				if len(chatData.VersesCrons) == 0 {
+				crons, err := dbGetAllCrons(chatId)
+				if err != nil {
+					sendErrorMessage(chatId)
+					return
+				}
+				if len(crons) == 0 {
 					message := SendMessage{
-						ChatId:    update.Message.Chat.Id,
-						Text:      text,
-						ParseMode: "MarkdownV2",
+						ChatId:      chatId,
+						Text:        text,
+						ParseMode:   "MarkdownV2",
 						ReplyMarkup: ReplyKeyboardRemove,
 					}
 					go sendMessage(message)
 					return
 				}
-				if len(chatData.VersesCrons) == 1 {
+				if len(crons) == 1 {
 					text += "Текущее расписание будет считаться по новому поясу\\."
 				} else {
 					text += "Текущие расписания будут считаться по новому поясу\\."
 				}
-				for _, cron := range chatData.VersesCrons {
+				for _, cron := range crons {
 					text += "\n" + escapingSymbols(cronToString(cron))
 				}
 				message := SendMessage{
-					ChatId:      update.Message.Chat.Id,
+					ChatId:      chatId,
 					Text:        text,
 					ParseMode:   "MarkdownV2",
 					ReplyMarkup: ReplyKeyboardRemove,
 				}
 				go sendMessage(message)
 				return
-			} else if chatData.MessageStatus == MessageStatusBroadcast {
+			} else if messageStatus == MessageStatusBroadcast {
 				if update.Message.From.Id == adminId {
 					if update.Message.Text != "" {
-						chatData.MessageStatus = MessageStatusDefault
-						saveChatsDataToFile()
+						dbUpdateMessageStatus(chatId, MessageStatusDefault)
 						broadcastMessageToAll(update.Message.Text, update.Message.Entities)
 						message := SendMessage{
-							ChatId: adminId,
-							Text: "Сообщение разослано",
+							ChatId:      adminId,
+							Text:        "Сообщение разослано",
 							ReplyMarkup: ReplyKeyboardRemove,
 						}
 						go sendMessage(message)
