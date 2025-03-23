@@ -43,7 +43,7 @@ func dbUpdateMessageStatus(chatId int64, messageStatus MessageStatus) error {
 }
 
 func dbUpdateChatData(chatId int64, messageStatus MessageStatus, timezone string) error {
-	_, err := database.Exec("update chat set message_status = $1 and timezone = $2 where id = $3;", messageStatus, timezone, chatId)
+	_, err := database.Exec("update chat set message_status = $1, timezone = $2 where id = $3;", messageStatus, timezone, chatId)
 	if err != nil {
 		handleDbError(err)
 	}

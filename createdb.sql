@@ -2,7 +2,7 @@ create table chat (
     id bigint primary key,
     type int not null,
     message_status int not null default 0,
-    timezone varchar(50) default null
+    timezone varchar(50) not null default ''
 );
 
 create table verses_cron (
